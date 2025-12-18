@@ -101,19 +101,33 @@ class HotkeyManager {
     // MARK: - Features
     
     private func translateSelection() {
+        // Simulating keys requires Accessibility permissions
+        if !checkAccessibilityPermission() {
+            print("[HotkeyManager] ❌ Missing Accessibility permissions for Translate")
+            requestAccessibilityPermission()
+            return
+        }
+    
+        print("[HotkeyManager] ⌨️ Simulating Cmd+C...")
         simulateCopy()
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // Wait longer for clipboard to update (0.1s might be too short if system is busy)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             if let text = NSPasteboard.general.string(forType: .string), !text.isEmpty {
+                print("[HotkeyManager] ✅ Text copied: \(text.prefix(20))...")
                 let targetLang = text.range(of: "\\p{Han}", options: .regularExpression) != nil ? "English" : "Chinese"
                 NotificationCenter.default.post(
                     name: .hotkeyTranslate,
                     object: nil,
                     userInfo: ["text": text, "targetLang": targetLang]
                 )
+            } else {
+                print("[HotkeyManager] ⚠️ No text found in clipboard after copy")
             }
         }
     }
+    
+    // ... existing analyzeClipboardImage code ...
     
     private func analyzeClipboardImage() {
         let pasteboard = NSPasteboard.general
@@ -149,6 +163,16 @@ class HotkeyManager {
         keyUp?.post(tap: .cghidEventTap)
     }
     
+    private func checkAccessibilityPermission() -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false]
+        return AXIsProcessTrustedWithOptions(options as CFDictionary)
+    }
+    
+    private func requestAccessibilityPermission() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
+    }
+
     deinit {
         // Unregister hotkeys would go here if needed
     }
