@@ -21,23 +21,15 @@
 <table>
   <tr>
     <td align="center">
-      <img src="assets/chat-demo.gif" width="200px" /><br />
-      <b>💬 AI 对话</b>
+      <img src="assets/chat-demo.gif" width="250px" /><br />
+      <b>💬 AI 智能对话</b>
     </td>
     <td align="center">
-      <img src="assets/happy-jump.gif" width="200px" /><br />
-      <b>😸 开心跳跃</b>
-    </td>
-    <td align="center">
-      <img src="assets/sleeping.gif" width="200px" /><br />
-      <b>😴 睡觉中</b>
+      <img src="assets/sleeping.gif" width="250px" /><br />
+      <b>😴 休息睡觉</b>
     </td>
   </tr>
   <tr>
-    <td align="center">
-      <img src="assets/walking.gif" width="200px" /><br />
-      <b>🚶 到处走走</b>
-    </td>
     <td colspan="2" align="center">
       <i>...还有更多可爱动画等你发现！</i>
     </td>
