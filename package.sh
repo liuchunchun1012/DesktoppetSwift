@@ -41,6 +41,12 @@ else
     exit 1
 fi
 
+# Copy app icon
+if [ -f "AppIcon.icns" ]; then
+    cp AppIcon.icns "$APP_DIR/Contents/Resources/"
+    echo "✅ App icon copied"
+fi
+
 # 5. Create Info.plist
 echo "Creating Info.plist..."
 cat > "$APP_DIR/Contents/Info.plist" <<EOF
@@ -54,6 +60,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
     <string>com.desktoppet.${APP_NAME}</string>
     <key>CFBundleName</key>
     <string>${APP_NAME}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
     <key>CFBundleVersion</key>
