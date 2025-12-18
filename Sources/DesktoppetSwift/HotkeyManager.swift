@@ -26,7 +26,7 @@ class HotkeyManager {
         
         // 1. Register Hotkeys
         registerHotkey(keyCode: kVK_ANSI_J, id: .openChat)
-        registerHotkey(keyCode: kVK_ANSI_K, id: .translate)
+        registerHotkey(keyCode: kVK_ANSI_T, id: .translate)
         registerHotkey(keyCode: kVK_ANSI_L, id: .analyzeImage)
         
         // 2. Install Event Handler
@@ -101,33 +101,21 @@ class HotkeyManager {
     // MARK: - Features
     
     private func translateSelection() {
-        // Simulating keys requires Accessibility permissions
-        if !checkAccessibilityPermission() {
-            print("[HotkeyManager] ❌ Missing Accessibility permissions for Translate")
-            requestAccessibilityPermission()
-            return
-        }
-    
-        print("[HotkeyManager] ⌨️ Simulating Cmd+C...")
-        simulateCopy()
+        // Direct clipboard read - requires user to Cmd+C first
+        // This avoids the accessibility permission nightmare completely
         
-        // Wait longer for clipboard to update (0.1s might be too short if system is busy)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            if let text = NSPasteboard.general.string(forType: .string), !text.isEmpty {
-                print("[HotkeyManager] ✅ Text copied: \(text.prefix(20))...")
-                let targetLang = text.range(of: "\\p{Han}", options: .regularExpression) != nil ? "English" : "Chinese"
-                NotificationCenter.default.post(
-                    name: .hotkeyTranslate,
-                    object: nil,
-                    userInfo: ["text": text, "targetLang": targetLang]
-                )
-            } else {
-                print("[HotkeyManager] ⚠️ No text found in clipboard after copy")
-            }
+        if let text = NSPasteboard.general.string(forType: .string), !text.isEmpty {
+            let targetLang = text.range(of: "\\p{Han}", options: .regularExpression) != nil ? "English" : "Chinese"
+            NotificationCenter.default.post(
+                name: .hotkeyTranslate,
+                object: nil,
+                userInfo: ["text": text, "targetLang": targetLang]
+            )
+        } else {
+            // Optional: Notify user that they need to copy text first
+            print("[HotkeyManager] Clipboard empty or no text found")
         }
     }
-    
-    // ... existing analyzeClipboardImage code ...
     
     private func analyzeClipboardImage() {
         let pasteboard = NSPasteboard.general
@@ -152,27 +140,6 @@ class HotkeyManager {
         }
     }
     
-    private func simulateCopy() {
-        let source = CGEventSource(stateID: .hidSystemState)
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true) // C key
-        keyDown?.flags = .maskCommand
-        keyDown?.post(tap: .cghidEventTap)
-        
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false)
-        keyUp?.flags = .maskCommand
-        keyUp?.post(tap: .cghidEventTap)
-    }
-    
-    private func checkAccessibilityPermission() -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false]
-        return AXIsProcessTrustedWithOptions(options as CFDictionary)
-    }
-    
-    private func requestAccessibilityPermission() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
-    }
-
     deinit {
         // Unregister hotkeys would go here if needed
     }
