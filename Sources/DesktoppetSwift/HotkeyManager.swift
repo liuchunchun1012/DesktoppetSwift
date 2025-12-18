@@ -102,17 +102,16 @@ class HotkeyManager {
     
     private func translateSelection() {
         // Direct clipboard read - requires user to Cmd+C first
-        // This avoids the accessibility permission nightmare completely
+        // Uses menu bar setting for target language (default: Chinese)
         
         if let text = NSPasteboard.general.string(forType: .string), !text.isEmpty {
-            let targetLang = text.range(of: "\\p{Han}", options: .regularExpression) != nil ? "English" : "Chinese"
+            let targetLang = TranslateSettings.shared.targetLanguage
             NotificationCenter.default.post(
                 name: .hotkeyTranslate,
                 object: nil,
                 userInfo: ["text": text, "targetLang": targetLang]
             )
         } else {
-            // Optional: Notify user that they need to copy text first
             print("[HotkeyManager] Clipboard empty or no text found")
         }
     }

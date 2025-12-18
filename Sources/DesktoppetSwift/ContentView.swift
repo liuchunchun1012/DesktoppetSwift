@@ -279,6 +279,10 @@ struct ContentView: View {
     @State private var isBubbleHovered = false
     @State private var hideTimer: DispatchWorkItem?
     
+    // Image question support
+    @State private var pendingImageBase64: String?
+    private let imageInputWindow = ChatInputWindow()
+    
     var body: some View {
         // VStack with fixed-height sections so bubble doesn't push cat
         VStack(spacing: 0) {
@@ -423,7 +427,23 @@ struct ContentView: View {
                     chatMessage = error
                     scheduleHideBubble(afterSeconds: 5)
                 } else if let imageBase64 = userInfo["imageBase64"] as? String {
-                    handleImageAnalysis(imageBase64: imageBase64)
+                    // Store image and open input window for question
+                    pendingImageBase64 = imageBase64
+                    imageInputWindow.show(mode: .imageQuestion, imageBase64: imageBase64)
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .chatInputSubmitted)) { notification in
+            print("[ContentView] Received chatInputSubmitted notification")
+            if let userInfo = notification.userInfo,
+               let text = userInfo["text"] as? String,
+               let modeString = userInfo["mode"] as? String {
+                print("[ContentView] mode: \(modeString), text: \(text)")
+                if modeString == InputMode.imageQuestion.rawValue,
+                   let imageBase64 = pendingImageBase64 {
+                    print("[ContentView] Calling handleImageAnalysis with question: \(text)")
+                    handleImageAnalysis(imageBase64: imageBase64, question: text)
+                    pendingImageBase64 = nil  // Clear after use
                 }
             }
         }
@@ -479,6 +499,10 @@ struct ContentView: View {
                     self.scheduleHideBubble(afterSeconds: 15) // Longer for translation
                 }
             )
+        
+        case .imageQuestion:
+            // Image questions are handled via chatInputSubmitted notification, not here
+            break
         }
     }
     
@@ -531,7 +555,7 @@ struct ContentView: View {
     }
     
     /// Handle hotkey image analysis (⌘⌃⌥⇧+L)
-    private func handleImageAnalysis(imageBase64: String) {
+    private func handleImageAnalysis(imageBase64: String, question: String? = nil) {
         showChatBubble = true
         isLoading = true
         chatMessage = ""
@@ -540,6 +564,7 @@ struct ContentView: View {
         
         OllamaClient.shared.analyzeImageStream(
             imageBase64: imageBase64,
+            question: question,
             onUpdate: { partialResponse in
                 self.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
                 self.isLoading = false

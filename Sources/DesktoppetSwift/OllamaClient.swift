@@ -7,6 +7,10 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
     private let baseURL = PetConfig.ollamaBaseURL
     private let defaultModel = PetConfig.defaultModel
     
+    // Chat memory - keeps last N rounds of conversation
+    private let maxHistoryRounds = 20
+    private var chatHistory: [[String: String]] = []
+    
     private var streamSession: URLSession?
     private var streamData = Data()
     private var onStreamUpdate: ((String) -> Void)?
@@ -72,11 +76,22 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
             
             for line in lines {
                 if let jsonData = line.data(using: .utf8),
-                   let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                   let token = json["response"] as? String {
-                    fullResponse += token
-                    DispatchQueue.main.async {
-                        self.onStreamUpdate?(self.fullResponse)
+                   let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                    // Handle /api/generate format: {"response": "token"}
+                    // Handle /api/chat format: {"message": {"content": "token"}}
+                    var token: String?
+                    if let response = json["response"] as? String {
+                        token = response
+                    } else if let message = json["message"] as? [String: Any],
+                              let content = message["content"] as? String {
+                        token = content
+                    }
+                    
+                    if let token = token {
+                        fullResponse += token
+                        DispatchQueue.main.async {
+                            self.onStreamUpdate?(self.fullResponse)
+                        }
                     }
                 }
             }
@@ -121,7 +136,7 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
         generateStream(prompt: prompt, onUpdate: onUpdate, onComplete: onComplete)
     }
     
-    /// Chat with streaming
+    /// Chat with streaming and memory
     func chatStream(
         message: String,
         onUpdate: @escaping (String) -> Void,
@@ -134,16 +149,72 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
         formatter.dateFormat = "yyyy年MM月dd日 EEEE HH:mm"
         let dateString = formatter.string(from: now)
         
-        let prompt = """
+        // Build system message with time context
+        let systemContent = """
         【当前时间】\(dateString)
-
+        
         \(PetConfig.systemPrompt)
-
-        \(PetConfig.ownerName): \(message)
-
-        \(PetConfig.petName):
         """
-        generateStream(prompt: prompt, onUpdate: onUpdate, onComplete: onComplete)
+        
+        // Add user message to history
+        chatHistory.append(["role": "user", "content": message])
+        
+        // Trim history to keep only last N rounds (each round = 2 messages)
+        let maxMessages = maxHistoryRounds * 2
+        if chatHistory.count > maxMessages {
+            chatHistory = Array(chatHistory.suffix(maxMessages))
+        }
+        
+        // Build messages array for Ollama /api/chat
+        var messages: [[String: String]] = [
+            ["role": "system", "content": systemContent]
+        ]
+        messages.append(contentsOf: chatHistory)
+        
+        // Use /api/chat endpoint
+        let url = URL(string: "\(baseURL)/api/chat")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = [
+            "model": defaultModel,
+            "messages": messages,
+            "stream": true
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            onComplete(.failure(error))
+            return
+        }
+        
+        // Store callbacks
+        self.onStreamUpdate = onUpdate
+        self.onStreamComplete = { [weak self] result in
+            // On success, add assistant response to history
+            if case .success(let response) = result {
+                self?.chatHistory.append(["role": "assistant", "content": response])
+            }
+            onComplete(result)
+        }
+        self.fullResponse = ""
+        self.streamData = Data()
+        
+        // Create session with delegate for streaming
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 120
+        streamSession = URLSession(configuration: config, delegate: self, delegateQueue: .main)
+        
+        let task = streamSession?.dataTask(with: request)
+        task?.resume()
+    }
+    
+    /// Clear chat history
+    func clearChatHistory() {
+        chatHistory.removeAll()
+        print("[OllamaClient] Chat history cleared")
     }
     
     /// Non-streaming versions for compatibility

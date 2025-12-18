@@ -1,10 +1,28 @@
 import SwiftUI
 import AppKit
 
+/// Manages translation target language preference
+class TranslateSettings {
+    static let shared = TranslateSettings()
+    
+    private let key = "translateTargetLanguage"
+    
+    var targetLanguage: String {
+        get { UserDefaults.standard.string(forKey: key) ?? "Chinese" }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+    
+    var isChinese: Bool { targetLanguage == "Chinese" }
+}
+
 /// Manages the status bar (menu bar) icon and menu
 class StatusBarController {
     private var statusItem: NSStatusItem!
     private var chatInputWindow: ChatInputWindow!
+    
+    // Menu items that need to be updated
+    private var chineseMenuItem: NSMenuItem?
+    private var englishMenuItem: NSMenuItem?
     
     init() {
         chatInputWindow = ChatInputWindow()
@@ -33,6 +51,25 @@ class StatusBarController {
         let translateItem = NSMenuItem(title: "🌐 翻译", action: #selector(openTranslate), keyEquivalent: "")
         translateItem.target = self
         menu.addItem(translateItem)
+        
+        // Translate target submenu
+        let translateTargetMenu = NSMenu()
+        
+        let chineseItem = NSMenuItem(title: "翻译到中文", action: #selector(setTranslateToChinese), keyEquivalent: "")
+        chineseItem.target = self
+        translateTargetMenu.addItem(chineseItem)
+        self.chineseMenuItem = chineseItem
+        
+        let englishItem = NSMenuItem(title: "翻译到英文", action: #selector(setTranslateToEnglish), keyEquivalent: "")
+        englishItem.target = self
+        translateTargetMenu.addItem(englishItem)
+        self.englishMenuItem = englishItem
+        
+        let translateTargetMenuItem = NSMenuItem(title: "🔄 翻译目标", action: nil, keyEquivalent: "")
+        translateTargetMenuItem.submenu = translateTargetMenu
+        menu.addItem(translateTargetMenuItem)
+        
+        updateTranslateMenuState()
         
         menu.addItem(NSMenuItem.separator())
         
@@ -64,6 +101,22 @@ class StatusBarController {
         statusItem.menu = menu
     }
     
+    private func updateTranslateMenuState() {
+        let isChinese = TranslateSettings.shared.isChinese
+        chineseMenuItem?.state = isChinese ? .on : .off
+        englishMenuItem?.state = isChinese ? .off : .on
+    }
+    
+    @objc private func setTranslateToChinese() {
+        TranslateSettings.shared.targetLanguage = "Chinese"
+        updateTranslateMenuState()
+    }
+    
+    @objc private func setTranslateToEnglish() {
+        TranslateSettings.shared.targetLanguage = "English"
+        updateTranslateMenuState()
+    }
+    
     private func createAnimItem(_ title: String, action: String) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: #selector(triggerAnimation(_:)), keyEquivalent: "")
         item.target = self
@@ -93,7 +146,9 @@ extension Notification.Name {
 }
 
 // Input mode enum (shared)
-enum InputMode {
-    case chat
-    case translate
+enum InputMode: String {
+    case chat = "chat"
+    case translate = "translate"
+    case imageQuestion = "imageQuestion"
 }
+

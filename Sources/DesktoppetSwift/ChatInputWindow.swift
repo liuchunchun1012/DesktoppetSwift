@@ -6,9 +6,11 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
     private var window: NSPanel?
     private var mode: InputMode = .chat
     private var textField: NSTextField?
+    private var imageBase64: String?
     
-    func show(mode: InputMode) {
+    func show(mode: InputMode, imageBase64: String? = nil) {
         self.mode = mode
+        self.imageBase64 = imageBase64
         
         // Close existing window
         window?.close()
@@ -35,7 +37,17 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
             defer: false
         )
         
-        panel.title = mode == .chat ? "💬 和猫咪聊天" : "🌐 翻译"
+        var title: String
+        switch mode {
+        case .chat:
+            title = "和猫咪聊天"
+        case .translate:
+            title = "翻译"
+        case .imageQuestion:
+            title = "问问蠢蠢"
+        }
+        
+        panel.title = title
         panel.level = .floating
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = false
@@ -46,9 +58,20 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
         // Create content view with AppKit controls
         let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 350, height: 100))
         
+        let textFieldY: CGFloat = 50
+        
         // Text field
-        let textField = NSTextField(frame: NSRect(x: 20, y: 50, width: 310, height: 24))
-        textField.placeholderString = mode == .chat ? "说点什么..." : "输入要翻译的文字..."
+        let textField = NSTextField(frame: NSRect(x: 20, y: textFieldY, width: 310, height: 24))
+        var placeholder: String
+        switch mode {
+        case .chat:
+            placeholder = "说点什么..."
+        case .translate:
+            placeholder = "输入要翻译的文字..."
+        case .imageQuestion:
+            placeholder = "问一个关于这张图的问题..."
+        }
+        textField.placeholderString = placeholder
         textField.font = NSFont.systemFont(ofSize: 14)
         textField.bezelStyle = .roundedBezel
         textField.target = self
@@ -88,10 +111,15 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
         
         window?.close()
         
+        var userInfo: [String: Any] = ["text": text, "mode": mode.rawValue]
+        if let imageBase64 = imageBase64 {
+            userInfo["imageBase64"] = imageBase64
+        }
+        
         NotificationCenter.default.post(
             name: .chatInputSubmitted,
             object: nil,
-            userInfo: ["text": text, "mode": mode]
+            userInfo: userInfo
         )
     }
     
@@ -101,6 +129,7 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
     
     func windowWillClose(_ notification: Notification) {
         textField = nil
+        imageBase64 = nil
     }
 }
 
@@ -108,3 +137,4 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
 extension Notification.Name {
     static let chatInputSubmitted = Notification.Name("chatInputSubmitted")
 }
+
