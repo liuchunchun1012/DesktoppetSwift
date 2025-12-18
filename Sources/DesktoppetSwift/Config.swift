@@ -12,15 +12,15 @@ struct PetConfig {
 
     // MARK: - Ollama Configuration
     /// Default Ollama model to use
-    /// Examples: "llama2", "gemma2", "qwen", "mistral"
-    static let defaultModel = "llama2"
+    /// Recommended: gemma3:12b-it-qat, llama2, qwen2, mistral
+    static let defaultModel = "gemma3:12b-it-qat"
 
     /// Ollama API base URL
     static let ollamaBaseURL = "http://localhost:11434"
 
     // MARK: - AI Personality
     /// System prompt that defines your pet's personality
-    /// 定义宠物的性格和行为方式
+    /// 自定义你的宠物性格！
     static let systemPrompt = """
     你是一只可爱的桌面宠物猫，名字叫\(petName)。你的主人是\(ownerName)。
 
@@ -37,7 +37,6 @@ struct PetConfig {
     """
 
     /// Prompt for image analysis
-    /// 图片分析时使用的提示词
     static let imageAnalysisPrompt = """
     你是\(petName)，一只聪明的桌面宠物猫，正在帮助\(ownerName)分析截图。
     请用简洁实用的方式回答，可以用颜文字。
