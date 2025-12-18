@@ -10,7 +10,7 @@
 - 🤖 **本地 AI 驱动** - 使用 Ollama 提供智能对话功能
 - ⌨️ **全局快捷键** - 随时随地快速调用
   - `Cmd+Shift+J` - 打开聊天对话框
-  - `Cmd+Shift+K` - 翻译选中的文字
+  - `Cmd+Shift+T` - 翻译选中的文字 
   - `Cmd+Shift+L` - 分析剪贴板中的截图
 - 🎯 **可自定义** - 轻松更换宠物图、AI 性格、模型等
 - 🪟 **悬浮窗口** - 始终置顶，不影响其他应用
@@ -40,9 +40,8 @@
 
 - macOS 12.0 或更高版本
 - [Ollama](https://ollama.ai) - 本地 LLM 运行环境
-- 任意 Ollama 模型（推荐 `gemma3`、`qwenvl2.5`、`llava` 等）
+- 任意 Ollama 模型（推荐 `gemma3`、`qwen2.5`、`llava` 等）
 - （可选）支持视觉的模型用于截图分析（如 `gemma3`、`qwenvl2.5`）
-- （推荐）使用Quantization aware trained models (QAT) 模型，如 `gemma3:12b-it-qat`
 
 ## 🚀 快速开始
 
@@ -57,7 +56,7 @@ brew install ollama
 ollama serve
 
 # 拉取一个模型（新窗口）
-ollama pull gemma3:12b-it-qat
+ollama pull qwen2.5:7b
 ```
 
 ### 2. 克隆并构建项目
@@ -90,8 +89,7 @@ bash package.sh
 open DesktoppetSwift.app
 ```
 
-首次运行时，系统会请求**辅助功能权限**（用于全局快捷键）。请在：
-**系统设置 > 隐私与安全 > 辅助功能** 中允许。
+**提示：** 首次运行时，如果遇到系统拦截，请在"系统设置 > 隐私与安全"中点击"仍要打开"。目前版本使用了底层 API，**不再**需要繁琐的辅助功能权限！
 
 ## 🎨 自定义你的宠物
 
@@ -133,7 +131,7 @@ struct PetConfig {
     static let ownerName = "你的名字"
 
     // 修改 Ollama 模型
-    static let defaultModel = "gemma3:12b-it-qat"  // 或其他模型
+    static let defaultModel = "qwen2.5:7b"  // 或其他模型
 
     // 自定义 AI 性格
     static let systemPrompt = """
@@ -144,23 +142,11 @@ struct PetConfig {
 
 ### 修改快捷键
 
-编辑 `Sources/DesktoppetSwift/HotkeyManager.swift`：
-
-```swift
-// 修改快捷键组合
-private let modifierMask: NSEvent.ModifierFlags = [.command, .shift]
-
-// 修改按键码
-case 38: // J key -> 改成其他按键码
-```
-
-常用按键码参考：
-- J: 38
-- K: 40
-- L: 37
-- H: 4
-- N: 45
-- M: 46
+快捷键管理位于 `Sources/DesktoppetSwift/HotkeyManager.swift`。
+目前默认快捷键：
+- Cmd+Shift+J (Open Chat)
+- Cmd+Shift+T (Translate)
+- Cmd+Shift+L (Analyze Image)
 
 ## 📖 使用方法
 
@@ -176,11 +162,13 @@ case 38: // J key -> 改成其他按键码
 
 按下快捷键打开输入框，输入你想说的话，宠物会用 AI 回复你！
 
-#### 🌐 翻译（Cmd+Shift+K）
+#### 🌐 翻译（Cmd+Shift+T）
 
+💡 **使用技巧：**
 1. 选中任意文字
-2. 按 `Cmd+Shift+K`
-3. 宠物会自动翻译（中文↔英文智能识别）
+2. **按 `Cmd+C` 复制**
+3. 按 `Cmd+Shift+T`
+4. 宠物会自动翻译剪贴板内容
 
 #### 📸 截图分析（Cmd+Shift+L）
 
@@ -195,7 +183,7 @@ case 38: // J key -> 改成其他按键码
 - **SwiftUI** - UI 框架
 - **AppKit** - 窗口管理、快捷键
 - **Ollama API** - 本地 LLM
-- **Carbon Framework** - 全局快捷键监听
+- **Carbon Framework** - 全局快捷键监听 (稳定、无权限焦虑)
 
 ## 📝 项目结构
 
@@ -220,12 +208,11 @@ DesktoppetSwift/
 
 ## 🐛 常见问题
 
-### 快捷键不工作？
+### 快捷键没有反应？
 
-确保已授予**辅助功能权限**：
-1. 打开 **系统设置 > 隐私与安全 > 辅助功能**
-2. 找到并勾选 `DesktoppetSwift`
-3. 重启应用
+1. 确认应用正在运行（检查菜单栏有没有猫猫头图标）。
+2. 如果刚替换了文件重新打包，尝试退出并重新运行。
+3. 确认没有被其他应用占用按键。
 
 ### 宠物不说话？
 
