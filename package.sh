@@ -57,7 +57,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
     <key>CFBundleExecutable</key>
     <string>${APP_NAME}</string>
     <key>CFBundleIdentifier</key>
-    <string>com.desktoppet.${APP_NAME}</string>
+    <string>com.desktoppet.${APP_NAME}.v2</string>
     <key>CFBundleName</key>
     <string>${APP_NAME}</string>
     <key>CFBundleIconFile</key>
