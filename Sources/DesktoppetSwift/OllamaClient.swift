@@ -7,7 +7,7 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
     private let baseURL = PetConfig.ollamaBaseURL
     private let defaultModel = PetConfig.defaultModel
     
-    // Chat memory - keeps last N rounds of conversation
+    // Chat memory - keeps last N rounds of conversation (in memory only)
     private let maxHistoryRounds = 20
     private var chatHistory: [[String: String]] = []
     
@@ -227,6 +227,7 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
     }
     
     /// Analyze an image with streaming (for vision models like gemma3)
+    /// Also adds the Q&A to chat history so follow-up questions have context
     func analyzeImageStream(
         imageBase64: String,
         question: String? = nil,
@@ -242,6 +243,16 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
         
         let userQuestion = question ?? "请描述这张图片的内容"
         
+        // Add user question to chat history (with note about image)
+        let historyMessage = "[用户发送了一张图片] \(userQuestion)"
+        chatHistory.append(["role": "user", "content": historyMessage])
+        
+        // Trim history if needed
+        let maxMessages = maxHistoryRounds * 2
+        if chatHistory.count > maxMessages {
+            chatHistory = Array(chatHistory.suffix(maxMessages))
+        }
+        
         let prompt = """
         【当前时间】\(dateString)
 
@@ -254,7 +265,13 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
             prompt: prompt,
             images: [imageBase64],
             onUpdate: onUpdate,
-            onComplete: onComplete
+            onComplete: { [weak self] result in
+                // Add assistant response to chat history
+                if case .success(let response) = result {
+                    self?.chatHistory.append(["role": "assistant", "content": response])
+                }
+                onComplete(result)
+            }
         )
     }
     

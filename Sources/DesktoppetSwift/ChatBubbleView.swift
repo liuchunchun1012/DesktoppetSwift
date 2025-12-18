@@ -1,8 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Chat bubble that appears above the pet - simple auto-sizing with scroll
-/// Disappears automatically when mouse leaves
+/// Tuxedo cat themed chat bubble - soft cream background with black accents
 struct ChatBubbleView: View {
     let message: String
     let isLoading: Bool
@@ -10,53 +9,92 @@ struct ChatBubbleView: View {
     
     @State private var isHovering = false
     
+    // Tuxedo cat color palette
+    private let bubbleBackground = Color(red: 1.0, green: 0.98, blue: 0.95) // Warm cream
+    private let textColor = Color(red: 0.2, green: 0.2, blue: 0.2) // Soft black
+    private let accentColor = Color(red: 0.4, green: 0.4, blue: 0.4) // Gray accent
+    private let borderColor = Color(red: 0.3, green: 0.3, blue: 0.3).opacity(0.3)
+    
     var body: some View {
         VStack(spacing: 0) {
             // Bubble content
             VStack(alignment: .leading, spacing: 4) {
                 if isLoading && message.isEmpty {
                     HStack(spacing: 8) {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .frame(width: 16, height: 16)
-                        Text("思考中...")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
+                        // Cute paw loading indicator
+                        Text("🐾")
+                            .font(.system(size: 14))
+                            .opacity(0.8)
+                        Text("喵喵思考中...")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(accentColor)
                     }
                 } else {
                     ScrollView {
                         Text(message)
-                            .font(.system(size: 13))
-                            .foregroundColor(.primary)
+                            .font(.system(size: 13, weight: .regular, design: .rounded))
+                            .foregroundColor(textColor)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .frame(width: 200)
-            .frame(minHeight: 40, maxHeight: 300)
+            .frame(minHeight: 44, maxHeight: 300)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(NSColor.controlBackgroundColor))
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(bubbleBackground)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(borderColor, lineWidth: 1.5)
             )
-            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
             
-            // Triangle pointer
-            Triangle()
-                .fill(Color(NSColor.controlBackgroundColor))
-                .frame(width: 12, height: 6)
+            // Cute rounded triangle pointer
+            CatBubblePointer()
+                .fill(bubbleBackground)
+                .frame(width: 16, height: 8)
+                .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 2)
         }
         .onHover { hovering in
             isHovering = hovering
             onHover(hovering)
         }
+    }
+}
+
+/// Rounded triangle for cute bubble pointer
+struct CatBubblePointer: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let cornerRadius: CGFloat = 3
+        
+        path.move(to: CGPoint(x: rect.midX, y: rect.maxY - cornerRadius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.midX - cornerRadius, y: rect.maxY - cornerRadius * 2),
+            control: CGPoint(x: rect.midX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX + cornerRadius, y: rect.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX, y: rect.minY),
+            control: CGPoint(x: rect.minX, y: rect.minY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX - cornerRadius, y: rect.minY),
+            control: CGPoint(x: rect.maxX, y: rect.minY)
+        )
+        path.addLine(to: CGPoint(x: rect.midX + cornerRadius, y: rect.maxY - cornerRadius * 2))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.midX, y: rect.maxY - cornerRadius),
+            control: CGPoint(x: rect.midX, y: rect.maxY)
+        )
+        path.closeSubpath()
+        return path
     }
 }
 

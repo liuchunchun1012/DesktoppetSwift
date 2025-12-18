@@ -31,7 +31,7 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
     private func createWindow() {
         // Use NSPanel which can become key even for menu bar apps
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 350, height: 100),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 90),
             styleMask: [.titled, .closable, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -40,11 +40,11 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
         var title: String
         switch mode {
         case .chat:
-            title = "和猫咪聊天"
+            title = "🐱 和蠢蠢聊天"
         case .translate:
-            title = "翻译"
+            title = "🌐 翻译"
         case .imageQuestion:
-            title = "问问蠢蠢"
+            title = "📸 问问蠢蠢"
         }
         
         panel.title = title
@@ -55,46 +55,55 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
         panel.delegate = self
         panel.center()
         
-        // Create content view with AppKit controls
-        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 350, height: 100))
+        // Tuxedo cat color palette
+        let creamColor = NSColor(red: 1.0, green: 0.98, blue: 0.95, alpha: 1.0)
+        let darkGray = NSColor(red: 0.25, green: 0.25, blue: 0.25, alpha: 1.0)
         
-        let textFieldY: CGFloat = 50
+        // Create content view with custom background
+        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 90))
+        containerView.wantsLayer = true
+        containerView.layer?.backgroundColor = creamColor.cgColor
         
-        // Text field
-        let textField = NSTextField(frame: NSRect(x: 20, y: textFieldY, width: 310, height: 24))
+        let textFieldY: CGFloat = 45
+        
+        // Styled text field
+        let textField = NSTextField(frame: NSRect(x: 16, y: textFieldY, width: 288, height: 26))
         var placeholder: String
         switch mode {
         case .chat:
-            placeholder = "说点什么..."
+            placeholder = "喵~ 说点什么吧..."
         case .translate:
             placeholder = "输入要翻译的文字..."
         case .imageQuestion:
-            placeholder = "问一个关于这张图的问题..."
+            placeholder = "问一个关于这张图的问题喵~"
         }
         textField.placeholderString = placeholder
-        textField.font = NSFont.systemFont(ofSize: 14)
+        textField.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         textField.bezelStyle = .roundedBezel
         textField.target = self
         textField.action = #selector(submitFromTextField(_:))
         containerView.addSubview(textField)
         self.textField = textField
         
-        // Cancel button
-        let cancelButton = NSButton(frame: NSRect(x: 150, y: 15, width: 80, height: 28))
+        // Styled cancel button
+        let cancelButton = NSButton(frame: NSRect(x: 130, y: 10, width: 70, height: 26))
         cancelButton.title = "取消"
         cancelButton.bezelStyle = .rounded
+        cancelButton.font = NSFont.systemFont(ofSize: 12)
         cancelButton.target = self
         cancelButton.action = #selector(cancel)
-        cancelButton.keyEquivalent = "\u{1b}" // Escape
+        cancelButton.keyEquivalent = "\u{1b}"
         containerView.addSubview(cancelButton)
         
-        // Submit button
-        let submitButton = NSButton(frame: NSRect(x: 240, y: 15, width: 80, height: 28))
-        submitButton.title = "发送"
+        // Styled submit button with accent color
+        let submitButton = NSButton(frame: NSRect(x: 210, y: 10, width: 90, height: 26))
+        submitButton.title = "发送 🐾"
         submitButton.bezelStyle = .rounded
+        submitButton.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         submitButton.target = self
         submitButton.action = #selector(submit)
-        submitButton.keyEquivalent = "\r" // Return
+        submitButton.keyEquivalent = "\r"
+        submitButton.contentTintColor = darkGray
         containerView.addSubview(submitButton)
         
         panel.contentView = containerView
