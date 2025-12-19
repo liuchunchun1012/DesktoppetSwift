@@ -104,8 +104,16 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
                 self.onStreamComplete?(.failure(error))
             }
         } else {
+            // Filter out model artifacts like "end of turn"
+            var cleanedResponse = self.fullResponse
+            let artifactsToRemove = ["<end_of_turn>", "end of turn", "<|eot_id|>", "<|end|>"]
+            for artifact in artifactsToRemove {
+                cleanedResponse = cleanedResponse.replacingOccurrences(of: artifact, with: "", options: .caseInsensitive)
+            }
+            cleanedResponse = cleanedResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+            
             DispatchQueue.main.async {
-                self.onStreamComplete?(.success(self.fullResponse))
+                self.onStreamComplete?(.success(cleanedResponse))
             }
         }
         

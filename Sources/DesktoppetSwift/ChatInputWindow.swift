@@ -55,18 +55,12 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
         panel.delegate = self
         panel.center()
         
-        // Tuxedo cat color palette
-        let creamColor = NSColor(red: 1.0, green: 0.98, blue: 0.95, alpha: 1.0)
-        let darkGray = NSColor(red: 0.25, green: 0.25, blue: 0.25, alpha: 1.0)
-        
-        // Create content view with custom background
+        // Create content view (use system default colors for dark mode compatibility)
         let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 90))
-        containerView.wantsLayer = true
-        containerView.layer?.backgroundColor = creamColor.cgColor
         
         let textFieldY: CGFloat = 45
         
-        // Styled text field
+        // Text field
         let textField = NSTextField(frame: NSRect(x: 16, y: textFieldY, width: 288, height: 26))
         var placeholder: String
         switch mode {
@@ -78,32 +72,29 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
             placeholder = "问一个关于这张图的问题喵~"
         }
         textField.placeholderString = placeholder
-        textField.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        textField.font = NSFont.systemFont(ofSize: 13)
         textField.bezelStyle = .roundedBezel
         textField.target = self
         textField.action = #selector(submitFromTextField(_:))
         containerView.addSubview(textField)
         self.textField = textField
         
-        // Styled cancel button
+        // Cancel button
         let cancelButton = NSButton(frame: NSRect(x: 130, y: 10, width: 70, height: 26))
         cancelButton.title = "取消"
         cancelButton.bezelStyle = .rounded
-        cancelButton.font = NSFont.systemFont(ofSize: 12)
         cancelButton.target = self
         cancelButton.action = #selector(cancel)
         cancelButton.keyEquivalent = "\u{1b}"
         containerView.addSubview(cancelButton)
         
-        // Styled submit button with accent color
+        // Submit button
         let submitButton = NSButton(frame: NSRect(x: 210, y: 10, width: 90, height: 26))
         submitButton.title = "发送 🐾"
         submitButton.bezelStyle = .rounded
-        submitButton.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         submitButton.target = self
         submitButton.action = #selector(submit)
         submitButton.keyEquivalent = "\r"
-        submitButton.contentTintColor = darkGray
         containerView.addSubview(submitButton)
         
         panel.contentView = containerView

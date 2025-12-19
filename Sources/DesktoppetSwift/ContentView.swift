@@ -37,7 +37,7 @@ class SpriteAnimator: ObservableObject {
         "happy_jump": 2,
         "eating": 2,
         "rest_prepare": 1,  // Only once!
-        "rest_sleeping": 20, // Loop 5 times for longer sleep
+        "rest_sleeping": 20, // Loop more times for longer sleep
         "rest_wakeup": 1,   // Only once!
         "interact_belly": 2,
         "interact_refuse": 2
@@ -388,9 +388,15 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .chatInputSubmitted)) { notification in
             if let userInfo = notification.userInfo,
                let text = userInfo["text"] as? String,
-               let mode = userInfo["mode"] as? InputMode {
-                inputMode = mode
-                handleInput(text)
+               let modeString = userInfo["mode"] as? String {
+                // Handle chat and translate modes (imageQuestion is handled by second handler)
+                if modeString == InputMode.chat.rawValue {
+                    inputMode = .chat
+                    handleInput(text)
+                } else if modeString == InputMode.translate.rawValue {
+                    inputMode = .translate
+                    handleInput(text)
+                }
             }
         }
         // Listen for pet clicks (from PassthroughView)

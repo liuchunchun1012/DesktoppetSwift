@@ -113,9 +113,9 @@ struct PetConfig {
 }
 ```
 
-### 2️⃣ 更换宠物精灵图
+### 2️⃣ 更换宠物图
 
-将你的精灵图放入 `Sources/DesktoppetSwift/Resources/`，按以下结构组织：
+将你的宠物图放入 `Sources/DesktoppetSwift/Resources/`，按以下结构组织：
 
 ```
 Resources/
@@ -246,7 +246,7 @@ DesktoppetSwift/
 │   ├── OllamaClient.swift     # 🧠 AI 客户端 & 记忆
 │   ├── HotkeyManager.swift    # ⌨️ 快捷键
 │   ├── ContentView.swift      # 主视图
-│   └── Resources/             # 🐱 精灵图
+│   └── Resources/             # 🐱 宠物图
 ├── package.sh                 # 打包脚本
 └── README.md
 ```
