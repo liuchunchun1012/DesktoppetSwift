@@ -41,8 +41,8 @@
 
 - macOS 12.0 或更高版本
 - [Ollama](https://ollama.ai) - 本地 LLM 运行环境
-- 任意 Ollama 模型（推荐 `gemma3`、`qwen2.5`），具体参数视个人电脑配置而定
-- （可选）支持视觉的模型用于截图分析（如 `gemma3`）
+- 任意 Ollama 模型（推荐 `gemma3`、`qwen2.5vl`），具体参数视个人电脑配置而定
+- （可选）支持视觉的模型用于截图分析（如 `gemma3`、`qwen2.5vl`）
 - 推荐使用Quantization aware trained models (QAT)如`gemma3:12b-it-qat`
 
 ## 🚀 快速开始
