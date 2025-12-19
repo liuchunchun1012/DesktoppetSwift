@@ -63,18 +63,18 @@ class SpriteAnimator: ObservableObject {
     
     private func loadAllSprites() {
         let actions = [
-            "eating 2": "eating",
-            "happy 3/jump": "happy_jump",
-            "idle 3/grooming 1-12": "idle",
-            "interact 3/belly": "interact_belly",
-            "interact 3/refuse": "interact_refuse",
-            "rest 2/prepare": "rest_prepare",
-            "rest 2/sleeping": "rest_sleeping",
-            "rest 2/wakeup": "rest_wakeup",
-            "walk 2/left": "walk_left",
-            "walk 2/right": "walk_right",
-            "walk 2/up": "walk_up",
-            "walk 2/down": "walk_down"
+            "eating": "eating",
+            "happy/jump": "happy_jump",
+            "idle/grooming 1-12": "idle",
+            "interact/belly": "interact_belly",
+            "interact/refuse": "interact_refuse",
+            "rest/prepare": "rest_prepare",
+            "rest/sleeping": "rest_sleeping",
+            "rest/wakeup": "rest_wakeup",
+            "walk/left": "walk_left",
+            "walk/right": "walk_right",
+            "walk/up": "walk_up",
+            "walk/down": "walk_down"
         ]
         
         // Load sprites from bundle resources
