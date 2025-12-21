@@ -266,17 +266,27 @@ class SpriteAnimator: ObservableObject {
     }
 }
 
+/// 聊天状态管理器 - 使用 ObservableObject 确保在 NSHostingView 中正确更新 UI
+class ChatState: ObservableObject {
+    static let shared = ChatState()
+    
+    @Published var showChatBubble = false
+    @Published var chatMessage = ""
+    @Published var isLoading = false
+    @Published var isBubbleHovered = false
+    
+    private init() {}
+}
+
 struct ContentView: View {
     @StateObject private var animator = SpriteAnimator()
+    // 使用 @ObservedObject 因为 ChatState.shared 是外部管理的单例
+    @ObservedObject private var chatState = ChatState.shared
     
-    // AI Chat state
-    @State private var showChatBubble = false
-    @State private var chatMessage = ""
-    @State private var isLoading = false
+    // UI state
     @State private var showInputPopover = false
     @State private var inputText = ""
     @State private var inputMode: InputMode = .chat
-    @State private var isBubbleHovered = false
     @State private var hideTimer: DispatchWorkItem?
     
     // Image question support
@@ -288,12 +298,12 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // Chat bubble area (fixed height)
             ZStack {
-                if showChatBubble {
+                if chatState.showChatBubble {
                     ChatBubbleView(
-                        message: chatMessage,
-                        isLoading: isLoading,
+                        message: chatState.chatMessage,
+                        isLoading: chatState.isLoading,
                         onHover: { hovering in
-                            isBubbleHovered = hovering
+                            chatState.isBubbleHovered = hovering
                             if hovering {
                                 // Cancel hide timer when hovering
                                 hideTimer?.cancel()
@@ -303,6 +313,7 @@ struct ContentView: View {
                             }
                         }
                     )
+                    .id(chatState.chatMessage) // 强制在消息变化时重绘 ChatBubbleView
                     .transition(.opacity)
                 }
             }
@@ -372,7 +383,7 @@ struct ContentView: View {
                 }
             )
         }
-        .animation(.easeInOut(duration: 0.3), value: showChatBubble)
+        .animation(.easeInOut(duration: 0.3), value: chatState.showChatBubble)
         // Listen for menu bar commands
         .onReceive(NotificationCenter.default.publisher(for: .setAnimation)) { notification in
             if let action = notification.object as? String {
@@ -402,14 +413,14 @@ struct ContentView: View {
         // Listen for pet clicks (from PassthroughView)
         .onReceive(NotificationCenter.default.publisher(for: .petClicked)) { _ in
             // Jump anytime except while loading a response
-            if !isLoading {
+            if !chatState.isLoading {
                 animator.onTap()
             }
         }
         // Listen for bubble close (from PassthroughView)
         .onReceive(NotificationCenter.default.publisher(for: .bubbleClose)) { _ in
             withAnimation {
-                showChatBubble = false
+                chatState.showChatBubble = false
             }
             hideTimer?.cancel()
         }
@@ -420,17 +431,16 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .hotkeyTranslate)) { notification in
             if let userInfo = notification.userInfo,
-               let text = userInfo["text"] as? String,
-               let targetLang = userInfo["targetLang"] as? String {
-                handleTranslate(text: text, to: targetLang)
+               let text = userInfo["text"] as? String {
+                handleTranslate(text: text)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .hotkeyAnalyzeImage)) { notification in
             if let userInfo = notification.userInfo {
                 if let error = userInfo["error"] as? String {
                     // Show error message
-                    showChatBubble = true
-                    chatMessage = error
+                    chatState.showChatBubble = true
+                    chatState.chatMessage = error
                     scheduleHideBubble(afterSeconds: 5)
                 } else if let imageBase64 = userInfo["imageBase64"] as? String {
                     // Store image and open input window for question
@@ -456,9 +466,10 @@ struct ContentView: View {
     }
     
     private func handleInput(_ text: String) {
-        showChatBubble = true
-        isLoading = true
-        chatMessage = ""
+        print("[ContentView] handleInput called with: \(text)")
+        chatState.showChatBubble = true
+        chatState.isLoading = true
+        chatState.chatMessage = ""
         
         // Cancel any existing hide timer
         hideTimer?.cancel()
@@ -468,39 +479,44 @@ struct ContentView: View {
         
         switch inputMode {
         case .chat:
-            OllamaClient.shared.chatStream(
+            // 使用 AIProviderManager 支持多模型
+            print("[ContentView] Calling AIProviderManager.chatStream")
+            AIProviderManager.shared.chatStream(
                 message: text,
                 onUpdate: { partialResponse in
                     // Real-time streaming update
-                    self.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-                    self.isLoading = false
+                    print("[ContentView] onUpdate received: \(partialResponse.prefix(50))...")
+                    self.chatState.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+                    self.chatState.isLoading = false
                 },
                 onComplete: { result in
+                    print("[ContentView] onComplete received")
                     switch result {
                     case .success(let response):
-                        self.chatMessage = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                        print("[ContentView] Success: \(response.prefix(50))...")
+                        self.chatState.chatMessage = response.trimmingCharacters(in: .whitespacesAndNewlines)
                     case .failure(let error):
-                        self.chatMessage = "喵呜... 出错了: \(error.localizedDescription)"
+                        print("[ContentView] Error: \(error)")
+                        self.chatState.chatMessage = "喵呜... 出错了: \(error.localizedDescription)"
                     }
                     self.scheduleHideBubble(afterSeconds: 8)
                 }
             )
             
         case .translate:
-            let targetLang = text.range(of: "\\p{Han}", options: .regularExpression) != nil ? "English" : "Chinese"
-            OllamaClient.shared.translateStream(
+            // AIProviderManager.translateStream 从 UserSettings 获取目标语言
+            AIProviderManager.shared.translateStream(
                 text: text,
-                to: targetLang,
                 onUpdate: { partialResponse in
-                    self.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-                    self.isLoading = false
+                    self.chatState.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+                    self.chatState.isLoading = false
                 },
                 onComplete: { result in
                     switch result {
                     case .success(let translation):
-                        self.chatMessage = translation.trimmingCharacters(in: .whitespacesAndNewlines)
+                        self.chatState.chatMessage = translation.trimmingCharacters(in: .whitespacesAndNewlines)
                     case .failure(let error):
-                        self.chatMessage = "翻译失败: \(error.localizedDescription)"
+                        self.chatState.chatMessage = "翻译失败: \(error.localizedDescription)"
                     }
                     self.scheduleHideBubble(afterSeconds: 15) // Longer for translation
                 }
@@ -517,9 +533,9 @@ struct ContentView: View {
         
         let timer = DispatchWorkItem { [self] in
             // Only hide if not currently hovering
-            if !self.isBubbleHovered {
+            if !self.chatState.isBubbleHovered {
                 withAnimation {
-                    self.showChatBubble = false
+                    self.chatState.showChatBubble = false
                 }
                 // Resume normal behavior cycle
                 self.animator.startBehaviorCycle()
@@ -534,26 +550,26 @@ struct ContentView: View {
     }
     
     /// Handle hotkey translate (⌘⌃⌥⇧+K)
-    private func handleTranslate(text: String, to targetLang: String) {
-        showChatBubble = true
-        isLoading = true
-        chatMessage = ""
+    private func handleTranslate(text: String) {
+        chatState.showChatBubble = true
+        chatState.isLoading = true
+        chatState.chatMessage = ""
         hideTimer?.cancel()
         animator.setAction("idle")
-        
-        OllamaClient.shared.translateStream(
+
+        // AIProviderManager.translateStream 从 UserSettings 获取目标语言
+        AIProviderManager.shared.translateStream(
             text: text,
-            to: targetLang,
             onUpdate: { partialResponse in
-                self.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-                self.isLoading = false
+                self.chatState.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+                self.chatState.isLoading = false
             },
             onComplete: { result in
                 switch result {
                 case .success(let translation):
-                    self.chatMessage = translation.trimmingCharacters(in: .whitespacesAndNewlines)
+                    self.chatState.chatMessage = translation.trimmingCharacters(in: .whitespacesAndNewlines)
                 case .failure(let error):
-                    self.chatMessage = "翻译失败喵: \(error.localizedDescription)"
+                    self.chatState.chatMessage = "翻译失败喵: \(error.localizedDescription)"
                 }
                 self.scheduleHideBubble(afterSeconds: 15)
             }
@@ -562,25 +578,26 @@ struct ContentView: View {
     
     /// Handle hotkey image analysis (⌘⌃⌥⇧+L)
     private func handleImageAnalysis(imageBase64: String, question: String? = nil) {
-        showChatBubble = true
-        isLoading = true
-        chatMessage = ""
+        chatState.showChatBubble = true
+        chatState.isLoading = true
+        chatState.chatMessage = ""
         hideTimer?.cancel()
         animator.setAction("idle")
         
-        OllamaClient.shared.analyzeImageStream(
+        // 使用 AIProviderManager 支持多模型
+        AIProviderManager.shared.analyzeImageStream(
             imageBase64: imageBase64,
-            question: question,
+            question: question ?? PetConfig.imageAnalysisPrompt,
             onUpdate: { partialResponse in
-                self.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-                self.isLoading = false
+                self.chatState.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+                self.chatState.isLoading = false
             },
             onComplete: { result in
                 switch result {
                 case .success(let analysis):
-                    self.chatMessage = analysis.trimmingCharacters(in: .whitespacesAndNewlines)
+                    self.chatState.chatMessage = analysis.trimmingCharacters(in: .whitespacesAndNewlines)
                 case .failure(let error):
-                    self.chatMessage = "分析失败喵: \(error.localizedDescription)"
+                    self.chatState.chatMessage = "分析失败喵: \(error.localizedDescription)"
                 }
                 self.scheduleHideBubble(afterSeconds: 20) // Longer for image analysis
             }

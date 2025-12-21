@@ -60,3 +60,15 @@ Pods/
 # Personal notes
 硫蠢蠢.md
 *.personal
+
+# OpenSpec (spec-driven development, local only)
+openspec/
+
+# Agent instructions (local only)
+.agent/
+.claude/
+AGENTS.md
+CLAUDE.md
+
+# Release archives (regenerated on build)
+*.zip

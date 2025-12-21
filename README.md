@@ -7,14 +7,16 @@
 ## ✨ 特性
 
 - 🎨 **宠物动画** - 流畅的像素风格动画（行走、休息、互动等）
-- 🤖 **本地 AI 驱动** - 使用 Ollama 提供智能对话功能
+- 🤖 **多 AI 提供商** - 支持 Ollama / OpenAI / Claude / Gemini / 通义千问 / 自定义 API
+- ⚙️ **图形化设置** - 菜单栏一键配置，无需编辑代码
+- 🔒 **安全存储** - API Key 存储在 macOS Keychain
+- 🌐 **联网搜索** - 支持 API2D 等中转服务的联网功能
 - 🧠 **聊天记忆** - 记住最近 20 轮对话，支持上下文追问
-- ⌨️ **全局快捷键** - 随时随地快速调用
+- ⌨️ **全局快捷键**
   - `Cmd+Shift+J` - 打开聊天对话框
   - `Cmd+Shift+T` - 翻译**剪贴板**文字（需要先复制）
   - `Cmd+Shift+L` - 分析**剪贴板**截图（需要先复制，可追问）
-- 🔄 **翻译语言切换** - 菜单栏可切换翻译到的目标语言（中文/英文）
-- 🎯 **高度可定制** - 宠物外观、AI 性格、UI 样式全可自定义
+- 🔄 **翻译语言切换** - 支持中/英/日/韩四种语言
 - 🪟 **悬浮窗口** - 始终置顶，不影响其他应用
 
 ## 🎬 更多展示
@@ -40,170 +42,95 @@
 ## 📋 前置要求
 
 - macOS 12.0 或更高版本
-- [Ollama](https://ollama.ai) - 本地 LLM 运行环境
-- 任意 Ollama 模型（推荐 `gemma3`、`qwen2.5vl`），具体参数视个人电脑配置而定
-- （可选）支持视觉的模型用于截图分析（如 `gemma3`、`qwen2.5vl`）
-- 推荐使用Quantization aware trained models (QAT)如`gemma3:12b-it-qat`
+- **Intel Mac** 或 **Apple Silicon (M1/M2/M3/M4)**
+- AI 服务（二选一）：
+  - **云端 API**：OpenAI / Claude / Gemini / 通义千问 的 API Key（或 API2D 等中转服务）
+  - **本地模型**：[Ollama](https://ollama.ai) + 任意模型
 
 ## 🚀 快速开始
 
-### 1. 安装 Ollama
+### 方法一：下载 Release（推荐普通用户）
 
-```bash
-# 访问 https://ollama.ai 下载安装，或使用 Homebrew
-brew install ollama
+> 💡 无需安装任何开发工具！下载即用，解压直接运行。
 
-# 启动 Ollama 服务
-ollama serve
+1. 从 [Releases](https://github.com/liuchunchun1012/DesktoppetSwift/releases) 下载 **`DesktoppetSwift-Universal.zip`**
+2. 解压后将 `DesktoppetSwift.app` 拖入「应用程序」文件夹（可选）
+3. 双击运行。首次运行如遇系统拦截，请在「**系统设置 > 隐私与安全**」中点击「**仍要打开**」
+4. 点击菜单栏 🐱 图标 → **设置**，选择 AI 提供商并填入 API Key
 
-# 拉取一个模型（新窗口）
-ollama pull gemma3:12b-it-qat
-```
+**支持架构**：Intel Mac (x86_64) 和 Apple Silicon (M1/M2/M3/M4)
 
-### 2. 克隆并构建项目
+---
 
-> **需要先安装 Xcode**（App Store 免费下载），或安装 Command Line Tools：`xcode-select --install`
+### 方法二：一键安装脚本（推荐想用本地模型的用户）
+
+> 💡 自动安装 Ollama 和模型，构建并启动应用。
 
 ```bash
 git clone https://github.com/liuchunchun1012/DesktoppetSwift.git
 cd DesktoppetSwift
-./package.sh
-open DesktoppetSwift.app
+./install.sh
 ```
 
-**提示：** 首次运行时，如遇系统拦截，请在「系统设置 > 隐私与安全」中点击「仍要打开」。
+脚本会自动：
+- 检测并安装 Command Line Tools
+- 可选安装 Homebrew 和 Ollama
+- 可选下载推荐模型（gemma3、qwen3、llava 等）
+- 构建并启动应用
 
 ---
 
-## 🎨 自定义指南
+### 方法三：手动从源码构建（开发者）
 
-> **重要：** 所有修改后需重新构建才能生效：
-> ```bash
-> ./package.sh && open DesktoppetSwift.app
-> ```
+```bash
+# 安装 Command Line Tools（如果没有）
+xcode-select --install
 
-### 1️⃣ 基础配置 (`Config.swift`)
+# 克隆项目
+git clone https://github.com/liuchunchun1012/DesktoppetSwift.git
+cd DesktoppetSwift
 
-编辑 `Sources/DesktoppetSwift/Config.swift`：
+# 构建通用版（Intel + Apple Silicon）
+./package_universal.sh
 
-```swift
-struct PetConfig {
-    // 🐱 宠物名字
-    static let petName = "喵喵"
-    
-    // 👤 主人名字
-    static let ownerName = "主人"
-    
-    // 🤖 Ollama 模型（需先 ollama pull）
-    static let defaultModel = "gemma3:12b-it-qat"
-    
-    // 🌐 Ollama 服务地址
-    static let ollamaBaseURL = "http://localhost:11434"
-    
-    // 💬 AI 性格设定
-    static let systemPrompt = """
-    你是一只可爱的猫咪，名叫喵喵...
-    请用简短可爱的方式回复（1-3句话）。
-    """
-    
-    // 📸 图片分析时的人设
-    static let imageAnalysisPrompt = """
-    你是喵喵，正在帮主人分析图片...
-    """
-}
+# 运行
+open DesktoppetSwift.app
 ```
 
-### 2️⃣ 更换宠物图
+---
 
-将你的宠物图放入 `Sources/DesktoppetSwift/Resources/`，按以下结构组织：
+## ⚙️ 配置指南
 
-```
-Resources/
-├── idle/
-│   └── grooming 1-12/    # 待机动画 (frame_01.png, frame_02.png...)
-├── walk/                 # 行走动画
-│   ├── left/
-│   ├── right/
-│   ├── up/
-│   └── down/
-├── eating/
-├── happy/
-│   └── jump/
-├── rest/
-│   ├── prepare/
-│   ├── sleeping/
-│   └── wakeup/
-└── interact/
-    ├── belly/
-    └── refuse/
-```
+### 图形化设置（推荐）
 
-### 3️⃣ 自定义聊天气泡
+点击菜单栏 🐱 图标 → **设置**，可配置：
 
-编辑 `Sources/DesktoppetSwift/ChatBubbleView.swift`：
+| Tab | 可配置项 |
+|-----|---------|
+| **AI 设置** | 提供商选择、API Key、Base URL、模型选择、测试连接 |
+| **高级设置** | Temperature、Top-P、Max Tokens、联网搜索开关 |
+| **外观** | 自定义精灵图路径 |
+| **语言** | 翻译目标语言（中/英/日/韩） |
 
-```swift
-struct ChatBubbleView: View {
-    // 🎨 配色方案
-    private let bubbleBackground = Color(red: 1.0, green: 0.98, blue: 0.95) // 背景色
-    private let textColor = Color(red: 0.2, green: 0.2, blue: 0.2)         // 文字色
-    private let accentColor = Color(red: 0.4, green: 0.4, blue: 0.4)       // 强调色
-    
-    // 📝 修改加载提示
-    Text("🐾 喵喵思考中...")  // 改成你喜欢的
-    
-    // 📐 调整圆角
-    RoundedRectangle(cornerRadius: 16)  // 改数字调整圆角大小
-}
-```
+### 支持的 AI 提供商
 
-**配色建议：**
-- 奶牛猫风格：奶油白 `rgb(1.0, 0.98, 0.95)` + 黑色文字
-- 橘猫风格：浅橙色 `rgb(1.0, 0.96, 0.88)` + 棕色文字
-- 狗狗风格：米色 `rgb(0.96, 0.96, 0.86)` + 深棕色文字
+| 提供商 | 说明 | 需要 API Key |
+|--------|------|-------------|
+| **Ollama** | 本地运行，完全免费 | ❌ |
+| **OpenAI** | 已同步最新模型 | ✅ |
+| **Anthropic** | 已同步最新模型 | ✅ |
+| **Google Gemini** | 已同步最新模型 | ✅ |
+| **通义千问** | 已同步最新模型 | ✅ |
+| **自定义 API** | 支持 OpenAI 兼容服务（如 API2D） | ✅ |
 
-### 4️⃣ 自定义输入窗口
+### 代码级自定义（可选）
 
-编辑 `Sources/DesktoppetSwift/ChatInputWindow.swift`：
+如需修改宠物名称或精灵图，可编辑以下文件后重新构建：
 
-```swift
-private func createWindow() {
-    // 🎨 配色
-    let creamColor = NSColor(red: 1.0, green: 0.98, blue: 0.95, alpha: 1.0)
-    containerView.layer?.backgroundColor = creamColor.cgColor
-    
-    // 📝 窗口标题
-    case .chat:
-        title = "🐱 和喵喵聊天"
-    
-    // 💬 占位符文字
-    case .chat:
-        placeholder = "喵~ 说点什么吧..."
-    
-    // 🐾 发送按钮
-    submitButton.title = "发送 🐾"
-}
-```
-
-### 5️⃣ 调整记忆轮数
-
-编辑 `Sources/DesktoppetSwift/OllamaClient.swift`：
-
-```swift
-class OllamaClient {
-    // 修改这个数字调整记忆轮数（每轮 = 1问1答）
-    private let maxHistoryRounds = 20  // 默认 20 轮
-}
-```
-
-### 6️⃣ 修改快捷键
-
-编辑 `Sources/DesktoppetSwift/HotkeyManager.swift`：
-
-```swift
-// 按键码对照（常用）
-// J = 38, K = 40, L = 37, T = 17
-```
+| 文件 | 用途 |
+|------|------|
+| `Config.swift` | 宠物名称、默认 Prompt |
+| `Resources/` | 精灵图目录 |
 
 ---
 
@@ -214,8 +141,9 @@ class OllamaClient {
 | 操作 | 说明 |
 |------|------|
 | 拖拽 | 移动宠物位置 |
-| 点击 | 触发互动动画（默认跳跃） |
-| 菜单栏图标 | 切换动作、翻译设置、退出 |
+| 点击 | 触发跳跃动画 |
+| 鼠标悬浮 | 触发随机互动（翻肚皮 / 拒绝互动） |
+| 菜单栏图标 | 设置、切换动作、翻译设置、退出 |
 
 ### 快捷键功能
 
@@ -225,13 +153,13 @@ class OllamaClient {
 #### 🌐 翻译 `Cmd+Shift+T`
 1. 选中文字 → `Cmd+C` 复制
 2. 按 `Cmd+Shift+T`
-3. 默认翻译到**中文**，可在菜单栏切换到英文
+3. 可在设置中切换翻译目标语言（中/英/日/韩）
 
 #### 📸 截图分析 `Cmd+Shift+L`
 1. 使用截图工具截图（推荐 [Shottr](https://shottr.cc/)）或微信截图
 2. 按 `Cmd+Shift+L`，弹出输入框
 3. 输入问题（如「这是什么？」「帮我看看这道题」）
-4. 宠物会结合图片和问题回答，**可继续在聊天中追问**！
+4. 宠物会结合图片和问题回答，**可继续追问**！
 
 ---
 
@@ -240,14 +168,21 @@ class OllamaClient {
 ```
 DesktoppetSwift/
 ├── Sources/DesktoppetSwift/
-│   ├── Config.swift           # ⭐ 基础配置
-│   ├── ChatBubbleView.swift   # 🎨 气泡样式
-│   ├── ChatInputWindow.swift  # 🎨 输入窗口样式
-│   ├── OllamaClient.swift     # 🧠 AI 客户端 & 记忆
-│   ├── HotkeyManager.swift    # ⌨️ 快捷键
-│   ├── ContentView.swift      # 主视图
-│   └── Resources/             # 🐱 宠物图
-├── package.sh                 # 打包脚本
+│   ├── Config.swift              # 宠物名称等基础配置
+│   ├── AIProvider.swift          # AI 提供商协议定义
+│   ├── AIProviderManager.swift   # 提供商统一管理
+│   ├── OllamaClient.swift        # Ollama 本地模型
+│   ├── OpenAICompatibleClient.swift  # OpenAI/自定义 API
+│   ├── AnthropicClient.swift     # Claude API
+│   ├── GeminiClient.swift        # Gemini API
+│   ├── SettingsWindow.swift      # 设置界面
+│   ├── UserSettings.swift        # 用户配置持久化
+│   ├── KeychainHelper.swift      # API Key 安全存储
+│   ├── ChatBubbleView.swift      # 聊天气泡
+│   ├── HotkeyManager.swift       # 快捷键管理
+│   └── Resources/                # 精灵图
+├── install.sh                    # 一键安装脚本
+├── package_universal.sh          # 通用包（Intel + M芯片）
 └── README.md
 ```
 
@@ -257,23 +192,27 @@ DesktoppetSwift/
 
 ### 快捷键没反应？
 1. 确认应用正在运行（菜单栏有猫头图标）
-2. 重新运行 `./package.sh && open DesktoppetSwift.app`
+2. 首次运行需要在「系统设置 > 隐私与安全 > 辅助功能」中授权
 
 ### 宠物不说话？
+
+**使用 Ollama 时**：
 ```bash
-# 测试 Ollama
+# 测试 Ollama 是否运行
 curl http://localhost:11434/api/tags
 
 # 没响应就启动 Ollama
 ollama serve
 ```
 
+**使用云端 API 时**：
+- 检查 API Key 是否正确填写
+- 点击「设置 → 测试连接」验证
+
 ### 截图分析不工作？
 需要支持视觉的模型：
-```bash
-ollama pull gemma3:12b-it-qat
-# 然后在 Config.swift 中配置 defaultModel
-```
+- Ollama: `gemma3`、`llava` 等
+- 云端: GPT-4o、Claude 3.5 Sonnet、Gemini 等
 
 ---
 
@@ -281,8 +220,8 @@ ollama pull gemma3:12b-it-qat
 
 - **SwiftUI** - UI 框架
 - **AppKit** - 窗口管理
-- **Ollama API** - 本地 LLM
-- **Carbon Framework** - 全局快捷键（稳定、无权限焦虑）
+- **Keychain Services** - API Key 安全存储
+- **Carbon Framework** - 全局快捷键
 
 ## 📜 开源协议
 

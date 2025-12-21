@@ -1,11 +1,25 @@
 import Foundation
 
 /// Client for communicating with local Ollama API
-class OllamaClient: NSObject, URLSessionDataDelegate {
+class OllamaClient: NSObject, AIProvider, URLSessionDataDelegate {
     static let shared = OllamaClient()
 
     private let baseURL = PetConfig.ollamaBaseURL
-    private let defaultModel = PetConfig.defaultModel
+    
+    // MARK: - AIProvider Protocol
+    
+    let providerType: AIProviderType = .ollama
+    
+    var currentModel: String {
+        get { UserSettings.shared.getConfig(for: .ollama).model }
+        set { 
+            var config = UserSettings.shared.getConfig(for: .ollama)
+            config.model = newValue
+            UserSettings.shared.updateConfig(config)
+        }
+    }
+    
+    var isConfigured: Bool { true }  // Ollama 不需要 API Key
     
     // Chat memory - keeps last N rounds of conversation (in memory only)
     private let maxHistoryRounds = 20
@@ -35,7 +49,7 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         var body: [String: Any] = [
-            "model": model ?? defaultModel,
+            "model": model ?? currentModel,
             "prompt": prompt,
             "stream": true  // Enable streaming
         ]
@@ -104,9 +118,9 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
                 self.onStreamComplete?(.failure(error))
             }
         } else {
-            // Filter out model artifacts like "end of turn"
+            // Filter out model artifacts like "end of turn" and "start of turn"
             var cleanedResponse = self.fullResponse
-            let artifactsToRemove = ["<end_of_turn>", "end of turn", "<|eot_id|>", "<|end|>"]
+            let artifactsToRemove = ["<end_of_turn>", "end of turn", "<start_of_turn>", "start of turn", "<|eot_id|>", "<|end|>", "<|start|>", "model"]
             for artifact in artifactsToRemove {
                 cleanedResponse = cleanedResponse.replacingOccurrences(of: artifact, with: "", options: .caseInsensitive)
             }
@@ -186,7 +200,7 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let body: [String: Any] = [
-            "model": defaultModel,
+            "model": currentModel,
             "messages": messages,
             "stream": true
         ]
@@ -290,13 +304,96 @@ class OllamaClient: NSObject, URLSessionDataDelegate {
             return
         }
         
-        URLSession.shared.dataTask(with: url) { data, response, error in
+        URLSession.shared.dataTask(with: url) { _, response, _ in
             if let httpResponse = response as? HTTPURLResponse {
-                completion(httpResponse.statusCode == 200)
+                DispatchQueue.main.async {
+                    completion(httpResponse.statusCode == 200)
+                }
             } else {
-                completion(false)
+                DispatchQueue.main.async {
+                    completion(false)
+                }
             }
         }.resume()
+    }
+    
+    /// Cancel current request (AIProvider protocol)
+    func cancelCurrentRequest() {
+        streamSession?.invalidateAndCancel()
+        streamSession = nil
+        onStreamComplete?(.failure(AIProviderError.cancelled))
+        onStreamComplete = nil
+        onStreamUpdate = nil
+    }
+    
+    // MARK: - AIProvider Protocol Methods
+    
+    /// Chat with streaming (AIProvider protocol)
+    func chatStream(
+        message: String,
+        history: [[String: String]],
+        systemPrompt: String,
+        onUpdate: @escaping (String) -> Void,
+        onComplete: @escaping (Result<String, Error>) -> Void
+    ) {
+        // Build messages array for Ollama /api/chat
+        var messages: [[String: String]] = [
+            ["role": "system", "content": systemPrompt]
+        ]
+        messages.append(contentsOf: history)
+        messages.append(["role": "user", "content": message])
+        
+        let url = URL(string: "\(baseURL)/api/chat")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = [
+            "model": currentModel,
+            "messages": messages,
+            "stream": true
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            onComplete(.failure(error))
+            return
+        }
+        
+        self.onStreamUpdate = onUpdate
+        self.onStreamComplete = onComplete
+        self.fullResponse = ""
+        self.streamData = Data()
+        
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 120
+        streamSession = URLSession(configuration: config, delegate: self, delegateQueue: .main)
+        
+        let task = streamSession?.dataTask(with: request)
+        task?.resume()
+    }
+    
+    /// Analyze image with streaming (AIProvider protocol)
+    func analyzeImageStream(
+        imageBase64: String,
+        question: String,
+        systemPrompt: String,
+        onUpdate: @escaping (String) -> Void,
+        onComplete: @escaping (Result<String, Error>) -> Void
+    ) {
+        let prompt = """
+        \(systemPrompt)
+        
+        请分析这张图片，回答问题：\(question)
+        """
+        
+        generateStream(
+            prompt: prompt,
+            images: [imageBase64],
+            onUpdate: onUpdate,
+            onComplete: onComplete
+        )
     }
 }
 

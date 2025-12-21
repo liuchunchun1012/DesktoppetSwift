@@ -1,28 +1,13 @@
 import SwiftUI
 import AppKit
 
-/// Manages translation target language preference
-class TranslateSettings {
-    static let shared = TranslateSettings()
-    
-    private let key = "translateTargetLanguage"
-    
-    var targetLanguage: String {
-        get { UserDefaults.standard.string(forKey: key) ?? "Chinese" }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
-    }
-    
-    var isChinese: Bool { targetLanguage == "Chinese" }
-}
-
 /// Manages the status bar (menu bar) icon and menu
 class StatusBarController {
     private var statusItem: NSStatusItem!
     private var chatInputWindow: ChatInputWindow!
-    
+
     // Menu items that need to be updated
-    private var chineseMenuItem: NSMenuItem?
-    private var englishMenuItem: NSMenuItem?
+    private var languageMenuItems: [TranslationLanguage: NSMenuItem] = [:]
     
     init() {
         chatInputWindow = ChatInputWindow()
@@ -54,21 +39,24 @@ class StatusBarController {
         
         // Translate target submenu
         let translateTargetMenu = NSMenu()
-        
-        let chineseItem = NSMenuItem(title: "翻译到中文", action: #selector(setTranslateToChinese), keyEquivalent: "")
-        chineseItem.target = self
-        translateTargetMenu.addItem(chineseItem)
-        self.chineseMenuItem = chineseItem
-        
-        let englishItem = NSMenuItem(title: "翻译到英文", action: #selector(setTranslateToEnglish), keyEquivalent: "")
-        englishItem.target = self
-        translateTargetMenu.addItem(englishItem)
-        self.englishMenuItem = englishItem
-        
+
+        // Add all supported translation languages
+        for language in TranslationLanguage.allCases {
+            let item = NSMenuItem(
+                title: "翻译到\(language.displayName)",
+                action: #selector(setTranslateLanguage(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = language
+            translateTargetMenu.addItem(item)
+            languageMenuItems[language] = item
+        }
+
         let translateTargetMenuItem = NSMenuItem(title: "🔄 翻译目标", action: nil, keyEquivalent: "")
         translateTargetMenuItem.submenu = translateTargetMenu
         menu.addItem(translateTargetMenuItem)
-        
+
         updateTranslateMenuState()
         
         menu.addItem(NSMenuItem.separator())
@@ -94,6 +82,13 @@ class StatusBarController {
         
         menu.addItem(NSMenuItem.separator())
         
+        // Settings
+        let settingsItem = NSMenuItem(title: "⚙️ 设置...", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
         // Quit
         let quitItem = NSMenuItem(title: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
@@ -102,18 +97,15 @@ class StatusBarController {
     }
     
     private func updateTranslateMenuState() {
-        let isChinese = TranslateSettings.shared.isChinese
-        chineseMenuItem?.state = isChinese ? .on : .off
-        englishMenuItem?.state = isChinese ? .off : .on
+        let currentLanguage = UserSettings.shared.translationLanguage
+        for (language, menuItem) in languageMenuItems {
+            menuItem.state = (language == currentLanguage) ? .on : .off
+        }
     }
-    
-    @objc private func setTranslateToChinese() {
-        TranslateSettings.shared.targetLanguage = "Chinese"
-        updateTranslateMenuState()
-    }
-    
-    @objc private func setTranslateToEnglish() {
-        TranslateSettings.shared.targetLanguage = "English"
+
+    @objc private func setTranslateLanguage(_ sender: NSMenuItem) {
+        guard let language = sender.representedObject as? TranslationLanguage else { return }
+        UserSettings.shared.translationLanguage = language
         updateTranslateMenuState()
     }
     
@@ -137,6 +129,10 @@ class StatusBarController {
     @objc private func openTranslate() {
         chatInputWindow.show(mode: .translate)
     }
+    
+    @objc private func openSettings() {
+        SettingsWindowController.shared.showSettings()
+    }
 }
 
 // Notification names
@@ -151,4 +147,5 @@ enum InputMode: String {
     case translate = "translate"
     case imageQuestion = "imageQuestion"
 }
+
 
