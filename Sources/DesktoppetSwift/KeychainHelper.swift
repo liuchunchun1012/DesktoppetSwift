@@ -1,7 +1,15 @@
 import Foundation
 
-/// API Key 存储辅助类
-/// 使用 UserDefaults 存储 API Key（避免 Keychain 权限弹窗问题）
+/// API Key 安全存储辅助类
+///
+/// ⚠️ 注意：虽然类名为 KeychainHelper，但实际使用 UserDefaults 存储
+/// 原因：macOS 沙盒外应用使用 Keychain 会频繁弹出授权窗口，影响用户体验
+///
+/// 存储机制：
+/// - 持久化：UserDefaults（带前缀 "com.desktoppet.apikey."）
+/// - 运行时：内存缓存优化读取性能
+///
+/// 如果未来需要更高安全性，可以考虑迁移至 Keychain 并配合 App Sandbox 使用
 class KeychainHelper {
     static let shared = KeychainHelper()
     
