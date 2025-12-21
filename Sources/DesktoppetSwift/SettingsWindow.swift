@@ -601,7 +601,7 @@ struct AboutTab: View {
                 .font(.title)
                 .bold()
             
-            Text("版本 1.0")
+            Text("版本 1.1.0")
                 .foregroundColor(.secondary)
             
             Divider()
