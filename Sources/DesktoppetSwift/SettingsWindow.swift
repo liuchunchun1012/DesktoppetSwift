@@ -930,47 +930,11 @@ struct ObsidianSettingsTab: View {
                     }
                 }
                 
-                Divider()
-                
-                // 外部聊天记录辅助
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("外部聊天记录管理")
-                        .font(.headline)
-                    
-                    Text("由于二进制格式限制，请点击按钮打开对应文件夹手动整理到 Obsidian")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    HStack(spacing: 12) {
-                        ForEach(ChatHistoryImporter.shared.getAvailableSources(), id: \.rawValue) { source in
-                            Button(action: {
-                                ChatHistoryImporter.shared.openFolder(for: source)
-                            }) {
-                                HStack {
-                                    Image(systemName: "folder")
-                                    Text(source.rawValue)
-                                }
-                            }
-                        }
-                        
-                        if ChatHistoryImporter.shared.getAvailableSources().isEmpty {
-                            Text("未发现相关 AI 客户端")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
-                        }
-                        
-                        Spacer()
-                    }
-                }
-                
                 Spacer()
             }
             .padding()
         }
     }
-    
-    @State private var importStatus: SyncStatus = .idle
-    @State private var importMessage: String?
     
     private func selectVaultFolder() {
         let panel = NSOpenPanel()
