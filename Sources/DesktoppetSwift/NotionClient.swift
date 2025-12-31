@@ -501,14 +501,16 @@ struct DailySummary: Codable {
 struct TodoTask {
     let name: String           // 任务名称
     let priority: String       // 高/中/低
-    let dueDate: Date?         // 截止日期
+    let startDate: Date?       // 开始时间
+    let dueDate: Date?         // 截止时间
     let tags: [String]         // 标签：想法/工作/学习/项目/生活/紧急
     let status: String         // 未开始/进行中/已完成
     let type: String           // 临时任务/番茄钟/每日任务/长期任务
     
-    init(name: String, priority: String = "中", dueDate: Date? = nil, tags: [String] = [], status: String = "未开始", type: String = "临时任务") {
+    init(name: String, priority: String = "中", startDate: Date? = nil, dueDate: Date? = nil, tags: [String] = [], status: String = "未开始", type: String = "临时任务") {
         self.name = name
         self.priority = priority
+        self.startDate = startDate
         self.dueDate = dueDate
         self.tags = tags
         self.status = status
@@ -602,9 +604,16 @@ extension NotionClient {
             ]
         ]
         
+        // 可选字段：开始时间
+        if let startDate = task.startDate {
+            properties["开始时间"] = [
+                "date": ["start": ISO8601DateFormatter().string(from: startDate)]
+            ]
+        }
+        
         // 可选字段：截止日期
         if let dueDate = task.dueDate {
-            properties["截止日期"] = [
+            properties["截止时间"] = [
                 "date": ["start": ISO8601DateFormatter().string(from: dueDate)]
             ]
         }

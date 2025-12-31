@@ -89,18 +89,21 @@ class TaskParser {
     // MARK: - Private Methods
     
     private func buildExtractionPrompt(_ content: String) -> String {
+        let today = ISO8601DateFormatter().string(from: Date()).prefix(10)  // YYYY-MM-DD
         return """
 你是一个任务解析助手。请从用户消息中提取所有任务，返回 JSON 数组。
-如果用户提到多个任务，请分别提取每一个！
+今天是 \(today)，如果用户没说开始时间，默认用今天。
 
 可用选项：
 - priority：高、中、低
-- tags：想法、工作、学习、项目、生活、紧急（可多选）
+- tags：想法、工作、学习、项目、生活、紧急
 - type：临时任务、番茄钟、每日任务、长期任务
 - status：未开始、进行中、已完成
+- startDate：开始日期（YYYY-MM-DD，默认今天）
+- dueDate：截止日期（YYYY-MM-DD，可选）
 
-返回格式（数组，即使只有一个任务）：
-[{"name":"任务名","priority":"中","tags":["工作"],"type":"临时任务","status":"未开始"}]
+返回格式（数组）：
+[{"name":"任务","priority":"中","tags":["工作"],"type":"临时任务","status":"未开始","startDate":"\(today)","dueDate":null}]
 
 用户消息：\(content)
 """
@@ -137,10 +140,24 @@ class TaskParser {
                 let type = json["type"] as? String ?? "临时任务"
                 let status = json["status"] as? String ?? "未开始"
                 
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withFullDate]
+                
+                var startDate: Date? = Date()  // 默认今天
+                if let startStr = json["startDate"] as? String {
+                    startDate = formatter.date(from: startStr) ?? Date()
+                }
+                
+                var dueDate: Date? = nil
+                if let dueStr = json["dueDate"] as? String {
+                    dueDate = formatter.date(from: dueStr)
+                }
+                
                 return TodoTask(
                     name: name,
                     priority: priority,
-                    dueDate: nil,
+                    startDate: startDate,
+                    dueDate: dueDate,
                     tags: tags,
                     status: status,
                     type: type
@@ -169,6 +186,7 @@ class TaskParser {
         return TodoTask(
             name: name,
             priority: json["priority"] as? String ?? "中",
+            startDate: Date(),  // 默认今天
             dueDate: nil,
             tags: json["tags"] as? [String] ?? [],
             status: json["status"] as? String ?? "未开始",
