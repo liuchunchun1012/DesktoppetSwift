@@ -159,15 +159,6 @@ class NotionClient {
         // 清理 Database ID
         let cleanedDbId = cleanDatabaseId(databaseId)
         
-        // 映射 category 到中文
-        let categoryMap = [
-            "Dev": "开发",
-            "Life": "生活",
-            "Idea": "想法",
-            "Random": "随机"
-        ]
-        let chineseCategory = categoryMap[summary.category] ?? "随机"
-        
         // 映射 mood 到中文
         let moodMap = [
             "Happy": "开心",
@@ -189,25 +180,16 @@ class NotionClient {
                     ["text": ["content": summary.title]]
                 ]
             ],
-            "类型": [
-                "select": ["name": "日志"]
-            ],
             "内容": [
                 "rich_text": [
                     ["text": ["content": summary.content]]
                 ]
-            ],
-            "分类": [
-                "select": ["name": chineseCategory]
             ],
             "情绪": [
                 "select": ["name": chineseMood]
             ],
             "日期": [
                 "date": ["start": ISO8601DateFormatter().string(from: summary.date)]
-            ],
-            "状态": [
-                "status": ["name": "已完成"]
             ]
         ]
         
@@ -225,8 +207,6 @@ class NotionClient {
     }
 }
 
-// MARK: - Data Models
-
 /// 每日总结数据结构
 struct DailySummary: Codable {
     let title: String       // 一句话标题
@@ -243,6 +223,130 @@ struct DailySummary: Codable {
         self.mood = mood
         self.highlights = highlights
         self.date = date
+    }
+}
+
+/// TodoList 任务数据结构
+struct TodoTask {
+    let name: String           // 任务名称
+    let priority: String       // 高/中/低
+    let dueDate: Date?         // 截止日期
+    let tags: [String]         // 标签：想法/工作/学习/项目/生活/紧急
+    let status: String         // 未开始/进行中/已完成
+    let type: String           // 临时任务/番茄钟/每日任务/长期任务
+    
+    init(name: String, priority: String = "中", dueDate: Date? = nil, tags: [String] = [], status: String = "未开始", type: String = "临时任务") {
+        self.name = name
+        self.priority = priority
+        self.dueDate = dueDate
+        self.tags = tags
+        self.status = status
+        self.type = type
+    }
+}
+
+// MARK: - NotionClient Extension for TodoList
+
+extension NotionClient {
+    
+    /// 创建 TodoList 任务
+    func createTask(_ task: TodoTask, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let apiKey = KeychainHelper.shared.getNotionToken(), !apiKey.isEmpty else {
+            completion(.failure(NotionError.notConfigured))
+            return
+        }
+        
+        let databaseId = UserSettings.shared.todoListDatabaseId
+        guard !databaseId.isEmpty else {
+            completion(.failure(NotionError.noDatabaseId))
+            return
+        }
+        
+        guard let url = URL(string: "\(baseURL)/pages") else {
+            completion(.failure(NotionError.invalidURL))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = buildTaskBody(databaseId: databaseId, task: task)
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            print("[NotionClient] Creating task: \(task.name)")
+        } catch {
+            completion(.failure(error))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                if (200...299).contains(httpResponse.statusCode) {
+                    print("[NotionClient] Task created successfully!")
+                    DispatchQueue.main.async { completion(.success(())) }
+                } else {
+                    let errorMessage = data.flatMap { String(data: $0, encoding: .utf8) } ?? "Unknown error"
+                    print("[NotionClient] Task creation error: \(httpResponse.statusCode) - \(errorMessage)")
+                    DispatchQueue.main.async {
+                        completion(.failure(NotionError.apiError(httpResponse.statusCode, errorMessage)))
+                    }
+                }
+            }
+        }.resume()
+    }
+    
+    /// 构建 TodoList 任务请求体
+    private func buildTaskBody(databaseId: String, task: TodoTask) -> [String: Any] {
+        let cleanedDbId = cleanDatabaseId(databaseId)
+        
+        // 构建标签数组
+        var tagsArray: [[String: Any]] = []
+        for tag in task.tags {
+            tagsArray.append(["name": tag])
+        }
+        
+        var properties: [String: Any] = [
+            "任务名称": [
+                "title": [
+                    ["text": ["content": task.name]]
+                ]
+            ],
+            "优先级": [
+                "select": ["name": task.priority]
+            ],
+            "状态": [
+                "status": ["name": task.status]
+            ],
+            "类型": [
+                "select": ["name": task.type]
+            ]
+        ]
+        
+        // 可选字段：截止日期
+        if let dueDate = task.dueDate {
+            properties["截止日期"] = [
+                "date": ["start": ISO8601DateFormatter().string(from: dueDate)]
+            ]
+        }
+        
+        // 可选字段：标签
+        if !tagsArray.isEmpty {
+            properties["标签"] = ["multi_select": tagsArray]
+        }
+        
+        return [
+            "parent": ["database_id": cleanedDbId],
+            "properties": properties
+        ]
     }
 }
 
@@ -267,3 +371,4 @@ enum NotionError: Error, LocalizedError {
         }
     }
 }
+

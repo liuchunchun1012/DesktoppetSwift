@@ -22,6 +22,7 @@ class UserSettings: ObservableObject {
         static let ownerName = "ownerName"
         static let notionEnabled = "notionEnabled"
         static let notionDatabaseId = "notionDatabaseId"
+        static let todoListDatabaseId = "todoListDatabaseId"
     }
     
     // MARK: - Published Properties
@@ -103,10 +104,17 @@ class UserSettings: ObservableObject {
         }
     }
     
-    /// Notion Database ID
+    /// Notion Database ID (日志)
     @Published var notionDatabaseId: String {
         didSet {
             defaults.set(notionDatabaseId, forKey: Keys.notionDatabaseId)
+        }
+    }
+    
+    /// TodoList Database ID
+    @Published var todoListDatabaseId: String {
+        didSet {
+            defaults.set(todoListDatabaseId, forKey: Keys.todoListDatabaseId)
         }
     }
     
@@ -161,6 +169,7 @@ class UserSettings: ObservableObject {
         // 加载 Notion 配置
         self.notionEnabled = defaults.bool(forKey: Keys.notionEnabled)
         self.notionDatabaseId = defaults.string(forKey: Keys.notionDatabaseId) ?? ""
+        self.todoListDatabaseId = defaults.string(forKey: Keys.todoListDatabaseId) ?? ""
         
         loadProviderConfigs()
     }

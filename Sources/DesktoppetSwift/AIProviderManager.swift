@@ -97,6 +97,13 @@ class AIProviderManager: ObservableObject {
         onUpdate: @escaping (String) -> Void,
         onComplete: @escaping (Result<String, Error>) -> Void
     ) {
+        // 检测任务命令：记任务：xxx
+        if TaskParser.isTaskCommand(message) {
+            let taskContent = TaskParser.extractTaskContent(message)
+            handleTaskCommand(taskContent, onUpdate: onUpdate, onComplete: onComplete)
+            return
+        }
+        
         guard let provider = currentProvider else {
             onComplete(.failure(AIProviderError.notConfigured))
             return
@@ -125,6 +132,31 @@ class AIProviderManager: ObservableObject {
                 onComplete(result)
             }
         )
+    }
+    
+    /// 处理任务命令
+    private func handleTaskCommand(
+        _ content: String,
+        onUpdate: @escaping (String) -> Void,
+        onComplete: @escaping (Result<String, Error>) -> Void
+    ) {
+        // 检查是否配置了 TodoList
+        guard !UserSettings.shared.todoListDatabaseId.isEmpty else {
+            onComplete(.success("喵～你还没有配置 TodoList 呢！请在设置里填入 TodoList Database ID 哦～"))
+            return
+        }
+        
+        onUpdate("📝 正在记录任务...")
+        
+        TaskParser.shared.parseAndCreate(content) { result in
+            switch result {
+            case .success(let task):
+                let response = "📝 已记录！\n任务：\(task.name)\n优先级：\(task.priority)\n类型：\(task.type)"
+                onComplete(.success(response))
+            case .failure(let error):
+                onComplete(.success("喵呜...记录任务失败了：\(error.localizedDescription)"))
+            }
+        }
     }
     
     /// 分析图片（流式）
