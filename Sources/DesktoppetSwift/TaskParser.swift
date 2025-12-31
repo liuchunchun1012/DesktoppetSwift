@@ -70,21 +70,17 @@ class TaskParser {
     private func buildExtractionPrompt(_ content: String) -> String {
         return """
 你是一个任务解析助手。请从用户消息中提取任务信息，返回 JSON 格式。
+注意：直接返回 JSON，不要用 markdown 代码块包裹。
 
 可用选项：
 - priority（优先级）：高、中、低
 - tags（标签）：想法、工作、学习、项目、生活、紧急（可多选）
 - type（类型）：临时任务、番茄钟、每日任务、长期任务
+- status（状态）：未开始、进行中、已完成（根据用户描述判断，默认未开始）
 - dueDate（截止日期）：ISO8601 格式，如 2025-01-01，可选
 
-返回格式（只返回 JSON，不要其他内容）：
-{
-    "name": "任务名称",
-    "priority": "中",
-    "tags": ["工作"],
-    "type": "临时任务",
-    "dueDate": null
-}
+返回格式：
+{"name": "任务名称", "priority": "中", "tags": ["工作"], "type": "临时任务", "status": "未开始", "dueDate": null}
 
 用户消息：\(content)
 """
@@ -112,6 +108,7 @@ class TaskParser {
             let priority = json?["priority"] as? String ?? "中"
             let tags = json?["tags"] as? [String] ?? []
             let type = json?["type"] as? String ?? "临时任务"
+            let status = json?["status"] as? String ?? "未开始"
             
             var dueDate: Date? = nil
             if let dueDateString = json?["dueDate"] as? String {
@@ -125,7 +122,7 @@ class TaskParser {
                 priority: priority,
                 dueDate: dueDate,
                 tags: tags,
-                status: "未开始",
+                status: status,
                 type: type
             )
         } catch {

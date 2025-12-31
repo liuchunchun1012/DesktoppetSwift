@@ -151,11 +151,11 @@ class DailySummaryGenerator {
         // 是否需要合并提示
         let mergeHint = existingContent != nil ? """
         
-        注意：这是今天的第二次总结，请整合以下之前的内容：
+        注意：需要整合之前已有的日志内容，将新内容与旧内容合并成一份完整的日志：
         ---
         \(existingContent ?? "")
         ---
-        请生成一个整合后的完整总结，保留之前的重要信息并加入新内容。
+        请生成整合后的完整总结，保留之前的重要信息并加入新内容，避免重复。
         """ : ""
         
         return """
@@ -165,7 +165,7 @@ class DailySummaryGenerator {
         1. 只记录实际完成的事项、技术细节、想法和决策
         2. 忽略所有闲聊、情感关怀、喝水提醒等非工作内容
         3. 内容要具体、详细，包含技术细节和具体成果
-        4. 不要用可爱语气，用简洁专业的记录风格
+        4. 适当用可爱语气，用简洁专业的记录风格
 
         今日对话记录：
         \(conversationsText)
@@ -174,7 +174,7 @@ class DailySummaryGenerator {
 
         请按以下 JSON 格式输出（只输出 JSON，不要其他文字）：
         {
-            "title": "今日核心成就（不超过25字，具体明确）",
+            "title": "今日核心成就（不超过250字，具体明确）",
             "content": "详细记录，格式如下：\\n【完成事项】\\n• 事项1：具体做了什么\\n• 事项2：技术细节\\n【灵感/想法】\\n• 想法1\\n【明日计划】\\n• 计划1（可选）",
             "category": "Dev 或 Life 或 Idea 或 Random",
             "mood": "Happy 或 Neutral 或 Frustrated 或 Excited",
