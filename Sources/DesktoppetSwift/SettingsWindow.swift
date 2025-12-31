@@ -982,8 +982,13 @@ struct ObsidianSettingsTab: View {
 struct AboutTab: View {
     var body: some View {
         VStack(spacing: 20) {
-            Text("🐱")
-                .font(.system(size: 60))
+            // App Icon
+            if let appIcon = NSApplication.shared.applicationIconImage {
+                Image(nsImage: appIcon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 80, height: 80)
+            }
             
             Text("DesktoppetSwift")
                 .font(.title)
@@ -1007,7 +1012,6 @@ struct AboutTab: View {
                 .foregroundColor(.secondary)
             
             Spacer()
-            
             HStack {
                 Link("GitHub", destination: URL(string: "https://github.com/liuchunchun1012/DesktoppetSwift")!)
                 Text("·")

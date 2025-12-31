@@ -49,11 +49,15 @@ class StatusBarController {
             )
             item.target = self
             item.representedObject = language
+            if let icon = NSImage(systemSymbolName: "globe", accessibilityDescription: nil) {
+                item.image = icon
+            }
             translateTargetMenu.addItem(item)
             languageMenuItems[language] = item
         }
 
-        let translateTargetMenuItem = NSMenuItem(title: "🔄 翻译目标", action: nil, keyEquivalent: "")
+        let translateTargetMenuItem = NSMenuItem(title: "翻译目标", action: nil, keyEquivalent: "")
+        translateTargetMenuItem.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
         translateTargetMenuItem.submenu = translateTargetMenu
         menu.addItem(translateTargetMenuItem)
 
@@ -62,12 +66,14 @@ class StatusBarController {
         menu.addItem(NSMenuItem.separator())
         
         // Daily Summary (Notion)
-        let summaryItem = NSMenuItem(title: "📓 今日总结", action: #selector(generateDailySummary), keyEquivalent: "")
+        let summaryItem = NSMenuItem(title: "今日总结", action: #selector(generateDailySummary), keyEquivalent: "")
+        summaryItem.image = NSImage(systemSymbolName: "doc.text", accessibilityDescription: nil)
         summaryItem.target = self
         menu.addItem(summaryItem)
         
         // Obsidian Sync
-        let obsidianItem = NSMenuItem(title: "📝 同步到 Obsidian", action: #selector(syncToObsidian), keyEquivalent: "")
+        let obsidianItem = NSMenuItem(title: "同步到 Obsidian", action: #selector(syncToObsidian), keyEquivalent: "")
+        obsidianItem.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: nil)
         obsidianItem.target = self
         menu.addItem(obsidianItem)
         
@@ -75,27 +81,29 @@ class StatusBarController {
         
         // Animation submenu
         let animMenu = NSMenu()
-        animMenu.addItem(createAnimItem("待机舔毛", action: "idle"))
-        animMenu.addItem(createAnimItem("开心跳跃", action: "happy_jump"))
-        animMenu.addItem(createAnimItem("吃猫粮", action: "eating"))
+        animMenu.addItem(createAnimItem("待机舔毛", action: "idle", symbol: "cat"))
+        animMenu.addItem(createAnimItem("开心跳跃", action: "happy_jump", symbol: "sparkles"))
+        animMenu.addItem(createAnimItem("吃猫粮", action: "eating", symbol: "fork.knife"))
         animMenu.addItem(NSMenuItem.separator())
-        animMenu.addItem(createAnimItem("准备睡觉", action: "rest_prepare"))
-        animMenu.addItem(createAnimItem("睡觉中", action: "rest_sleeping"))
-        animMenu.addItem(createAnimItem("起床", action: "rest_wakeup"))
+        animMenu.addItem(createAnimItem("准备睡觉", action: "rest_prepare", symbol: "moon"))
+        animMenu.addItem(createAnimItem("睡觉中", action: "rest_sleeping", symbol: "bed.double"))
+        animMenu.addItem(createAnimItem("起床", action: "rest_wakeup", symbol: "sunrise"))
         animMenu.addItem(NSMenuItem.separator())
-        animMenu.addItem(createAnimItem("向左走", action: "walk_left"))
-        animMenu.addItem(createAnimItem("向右走", action: "walk_right"))
-        animMenu.addItem(createAnimItem("向上走", action: "walk_up"))
-        animMenu.addItem(createAnimItem("向下走", action: "walk_down"))
+        animMenu.addItem(createAnimItem("向左走", action: "walk_left", symbol: "arrow.left"))
+        animMenu.addItem(createAnimItem("向右走", action: "walk_right", symbol: "arrow.right"))
+        animMenu.addItem(createAnimItem("向上走", action: "walk_up", symbol: "arrow.up"))
+        animMenu.addItem(createAnimItem("向下走", action: "walk_down", symbol: "arrow.down"))
         
-        let animMenuItem = NSMenuItem(title: "🐱 切换动作", action: nil, keyEquivalent: "")
+        let animMenuItem = NSMenuItem(title: "切换动作", action: nil, keyEquivalent: "")
+        animMenuItem.image = NSImage(systemSymbolName: "pawprint", accessibilityDescription: nil)
         animMenuItem.submenu = animMenu
         menu.addItem(animMenuItem)
         
         menu.addItem(NSMenuItem.separator())
         
         // Settings
-        let settingsItem = NSMenuItem(title: "⚙️ 设置...", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "设置...", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
         settingsItem.target = self
         menu.addItem(settingsItem)
         
@@ -103,6 +111,7 @@ class StatusBarController {
         
         // Quit
         let quitItem = NSMenuItem(title: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quitItem.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil)
         menu.addItem(quitItem)
         
         statusItem.menu = menu
@@ -121,10 +130,11 @@ class StatusBarController {
         updateTranslateMenuState()
     }
     
-    private func createAnimItem(_ title: String, action: String) -> NSMenuItem {
+    private func createAnimItem(_ title: String, action: String, symbol: String) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: #selector(triggerAnimation(_:)), keyEquivalent: "")
         item.target = self
         item.representedObject = action
+        item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         return item
     }
     
