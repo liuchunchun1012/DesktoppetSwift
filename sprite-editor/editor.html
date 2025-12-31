@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>桌宠精灵像素编辑器 🐱</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .editor-section {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .canvas-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .view-switcher {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .view-btn {
+            padding: 12px 24px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .view-btn:hover {
+            border-color: #667eea;
+            background: #f0f0ff;
+        }
+
+        .view-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .canvas-wrapper {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        #mainCanvas {
+            display: block;
+            background: white;
+            cursor: crosshair;
+            image-rendering: pixelated;
+            border: 2px solid #333;
+        }
+
+        .toolbar {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .toolbar h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .tool-group {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .color-btn {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 3px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .color-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .color-btn.active {
+            border-color: #333;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #333;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .current-color-display {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .current-color-box {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #333;
+            border-radius: 4px;
+        }
+
+        .api-section {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .api-section input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .status-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .status-box.generating {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+
+        .status-box.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+
+        .status-box.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .version-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .version-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .version-item.active {
+            border: 2px solid #667eea;
+        }
+
+        .version-time {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .help-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .help-box p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>桌宠精灵像素编辑器 🐱</h1>
+            <p>点击格子填色 · AI 生成完整动画</p>
+        </div>
+
+        <div class="content">
+            <!-- API Key 配置 -->
+            <div class="api-section">
+                <h3>⚙️ Gemini API 配置</h3>
+                <input type="text" id="apiKeyInput" placeholder="输入 Gemini API Key...">
+                <button class="btn btn-secondary" onclick="saveApiKey()" style="margin-top: 10px;">保存 API Key</button>
+            </div>
+
+            <!-- 帮助提示 -->
+            <div class="help-box">
+                <p>💡 <strong>使用说明：</strong></p>
+                <p>1. 选择视角（正面/背面/左侧/右侧）</p>
+                <p>2. 选择颜色</p>
+                <p>3. 点击格子填色（按住鼠标拖动可连续填色）</p>
+                <p>4. 完成 4 个视角后，点击"生成精灵动画"</p>
+                <p style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ccc;">
+                    <strong>快捷操作：</strong><br>
+                    • 鼠标滚轮：缩放画布<br>
+                    • Ctrl+Z：撤销 | Ctrl+Y：重做<br>
+                    • +/- 键：放大/缩小 | 0 键：重置缩放<br>
+                    • E 键：切换橡皮擦
+                </p>
+            </div>
+
+            <!-- 编辑器主区域 -->
+            <div class="editor-section">
+                <!-- 画布区 -->
+                <div class="canvas-area">
+                    <div class="view-switcher">
+                        <button class="view-btn active" id="view-front" onclick="switchView('front')">
+                            🐱 正面
+                        </button>
+                        <button class="view-btn" id="view-back" onclick="switchView('back')">
+                            🐱 背面
+                        </button>
+                        <button class="view-btn" id="view-left" onclick="switchView('left')">
+                            🐱 左侧
+                        </button>
+                        <button class="view-btn" id="view-right" onclick="switchView('right')">
+                            🐱 右侧
+                        </button>
+                    </div>
+
+                    <div class="canvas-wrapper">
+                        <canvas id="mainCanvas" width="640" height="640"></canvas>
+                    </div>
+
+                    <!-- 缩放控制 -->
+                    <div style="margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="zoomCanvas(-0.1)" style="width: auto; padding: 8px 16px;">
+                            🔍➖ 缩小
+                        </button>
+                        <span style="font-weight: 600; min-width: 60px; text-align: center;" id="zoomDisplay">100%</span>
+                        <button class="btn btn-secondary" onclick="zoomCanvas(0.1)" style="width: auto; padding: 8px 16px;">
+                            🔍➕ 放大
+                        </button>
+                        <button class="btn btn-secondary" onclick="resetZoom()" style="width: auto; padding: 8px 16px;">
+                            ↺ 重置
+                        </button>
+                    </div>
+
+                    <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                        <button class="btn btn-secondary" id="undoBtn" onclick="undo()" style="width: auto; padding: 10px 20px;">
+                            ↶ 撤销 (Ctrl+Z)
+                        </button>
+                        <button class="btn btn-secondary" id="redoBtn" onclick="redo()" style="width: auto; padding: 10px 20px;">
+                            ↷ 重做 (Ctrl+Y)
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadTemplate()" style="width: auto; padding: 10px 20px;">
+                            📁 加载参考图
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearCanvas()" style="width: auto; padding: 10px 20px;">
+                            🗑️ 清空
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 工具栏 -->
+                <div class="toolbar">
+                    <div class="tool-group">
+                        <h3>🎨 调色板</h3>
+                        <div class="color-palette">
+                            <button class="color-btn active" style="background: #000000;" onclick="setColor('#000000', event)"></button>
+                            <button class="color-btn" style="background: #ffffff; border-color: #999;" onclick="setColor('#ffffff', event)"></button>
+                            <button class="color-btn" style="background: #ff6b6b;" onclick="setColor('#ff6b6b', event)"></button>
+                            <button class="color-btn" style="background: #4ecdc4;" onclick="setColor('#4ecdc4', event)"></button>
+                            <button class="color-btn" style="background: #45b7d1;" onclick="setColor('#45b7d1', event)"></button>
+                            <button class="color-btn" style="background: #ffa07a;" onclick="setColor('#ffa07a', event)"></button>
+                            <button class="color-btn" style="background: #98d8c8;" onclick="setColor('#98d8c8', event)"></button>
+                            <button class="color-btn" style="background: #f7b731;" onclick="setColor('#f7b731', event)"></button>
+                            <button class="color-btn" style="background: #5f27cd;" onclick="setColor('#5f27cd', event)"></button>
+                            <button class="color-btn" style="background: #ee5a6f;" onclick="setColor('#ee5a6f', event)"></button>
+                        </div>
+                        <input type="color" id="customColor" onchange="setColor(this.value, event)" style="width: 100%; height: 40px; border: 2px solid #ddd; border-radius: 6px; cursor: pointer;">
+
+                        <div class="current-color-display">
+                            <span style="font-size: 14px; font-weight: 600;">当前颜色:</span>
+                            <div id="currentColorDisplay" class="current-color-box" style="background: #000000;"></div>
+                        </div>
+                    </div>
+
+                    <div class="tool-group">
+                        <button class="btn btn-secondary" onclick="setEraser()">
+                            🧹 橡皮擦
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 生成区域 -->
+            <div style="margin-top: 40px; padding-top: 40px; border-top: 2px solid #f0f0f0;">
+                <div class="section-title">🚀 生成动画</div>
+
+                <div class="status-box" id="statusBox">
+                    <p id="statusText">准备就绪，完成 4 个视角后点击生成</p>
+                </div>
+
+                <button class="btn btn-primary" id="generateBtn" onclick="generateSprites()" style="max-width: 400px; margin: 0 auto; display: block; font-size: 18px; padding: 15px;">
+                    🚀 生成精灵动画
+                </button>
+            </div>
+
+            <!-- 版本管理 -->
+            <div style="margin-top: 40px; padding-top: 40px; border-top: 2px solid #f0f0f0;">
+                <div class="section-title">📦 生成历史</div>
+
+                <div id="versionSection" class="hidden">
+                    <div class="version-list" id="versionList"></div>
+
+                    <div style="text-align: center; margin: 20px 0;">
+                        <canvas id="previewCanvas" width="128" height="128" style="border: 2px solid #ddd; border-radius: 8px; background: white; image-rendering: pixelated;"></canvas>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="downloadZip()" style="margin-top: 20px;">
+                        💾 下载 ZIP 文件
+                    </button>
+                </div>
+
+                <div id="noVersions" style="text-align: center; color: #888; padding: 40px;">
+                    还没有生成任何版本
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+
+    <script src="jszip.min.js"></script>
+    <script src="gemini-api.js"></script>
+    <script src="pixel-editor-v2.js"></script>
+</body>
+</html>

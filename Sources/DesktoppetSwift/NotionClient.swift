@@ -74,18 +74,25 @@ class NotionClient {
     /// 测试 Notion 连接
     func testConnection(completion: @escaping (Bool) -> Void) {
         guard let apiKey = KeychainHelper.shared.getNotionToken(), !apiKey.isEmpty else {
+            print("[NotionClient] Test failed: No API token")
             completion(false)
             return
         }
         
         let databaseId = UserSettings.shared.notionDatabaseId
         guard !databaseId.isEmpty else {
+            print("[NotionClient] Test failed: No database ID")
             completion(false)
             return
         }
         
+        // 清理 Database ID（移除可能的 URL 前缀或多余字符）
+        let cleanedDbId = cleanDatabaseId(databaseId)
+        print("[NotionClient] Testing connection with DB ID: \(cleanedDbId)")
+        
         // 尝试获取数据库信息来验证连接
-        guard let url = URL(string: "\(baseURL)/databases/\(databaseId)") else {
+        guard let url = URL(string: "\(baseURL)/databases/\(cleanedDbId)") else {
+            print("[NotionClient] Test failed: Invalid URL")
             completion(false)
             return
         }
@@ -94,55 +101,126 @@ class NotionClient {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
         
-        URLSession.shared.dataTask(with: request) { _, response, error in
+        print("[NotionClient] Sending test request to: \(url)")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("[NotionClient] Network error: \(error.localizedDescription)")
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            
             if let httpResponse = response as? HTTPURLResponse {
+                let responseBody = data.flatMap { String(data: $0, encoding: .utf8) } ?? "no body"
+                print("[NotionClient] Response: \(httpResponse.statusCode) - \(responseBody.prefix(200))")
+                
                 DispatchQueue.main.async {
                     completion(httpResponse.statusCode == 200)
                 }
             } else {
-                DispatchQueue.main.async {
-                    completion(false)
-                }
+                print("[NotionClient] No HTTP response")
+                DispatchQueue.main.async { completion(false) }
             }
         }.resume()
     }
     
-    // MARK: - Private Methods
+    /// 清理 Database ID（从 URL 或带连字符的格式中提取）
+    private func cleanDatabaseId(_ input: String) -> String {
+        var result = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 如果是 Notion URL，提取 ID 部分
+        if result.contains("notion.so") {
+            // https://www.notion.so/workspace/Title-abc123def456...
+            // 或 https://notion.so/abc123def456...
+            if let range = result.range(of: #"[a-f0-9]{32}"#, options: .regularExpression) {
+                result = String(result[range])
+            } else if let lastComponent = result.split(separator: "/").last {
+                // 尝试获取最后一段
+                let idPart = String(lastComponent)
+                if let questionMark = idPart.firstIndex(of: "?") {
+                    result = String(idPart[..<questionMark])
+                } else {
+                    result = idPart
+                }
+                // 如果包含标题，取最后的 32 字符
+                if result.count > 32 {
+                    result = String(result.suffix(32))
+                }
+            }
+        }
+        
+        // 移除连字符（有些人复制的 ID 带连字符）
+        result = result.replacingOccurrences(of: "-", with: "")
+        
+        return result
+    }
     
     private func buildPageBody(databaseId: String, summary: DailySummary) -> [String: Any] {
-        // ISO 8601 日期格式
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withFullDate]
-        let dateString = dateFormatter.string(from: summary.date)
+        // 清理 Database ID
+        let cleanedDbId = cleanDatabaseId(databaseId)
+        
+        // 映射 category 到中文
+        let categoryMap = [
+            "Dev": "开发",
+            "Life": "生活",
+            "Idea": "想法",
+            "Random": "随机"
+        ]
+        let chineseCategory = categoryMap[summary.category] ?? "随机"
+        
+        // 映射 mood 到中文
+        let moodMap = [
+            "Happy": "开心",
+            "Neutral": "平静",
+            "Frustrated": "沮丧",
+            "Excited": "兴奋"
+        ]
+        let chineseMood = moodMap[summary.mood] ?? "平静"
+        
+        // 构建标签数组
+        var tagsArray: [[String: Any]] = []
+        for tag in summary.highlights {
+            tagsArray.append(["name": tag])
+        }
+        
+        var properties: [String: Any] = [
+            "标题": [
+                "title": [
+                    ["text": ["content": summary.title]]
+                ]
+            ],
+            "类型": [
+                "select": ["name": "日志"]
+            ],
+            "内容": [
+                "rich_text": [
+                    ["text": ["content": summary.content]]
+                ]
+            ],
+            "分类": [
+                "select": ["name": chineseCategory]
+            ],
+            "情绪": [
+                "select": ["name": chineseMood]
+            ],
+            "日期": [
+                "date": ["start": ISO8601DateFormatter().string(from: summary.date)]
+            ],
+            "状态": [
+                "status": ["name": "已完成"]
+            ]
+        ]
+        
+        // 如果有标签，添加标签字段
+        if !tagsArray.isEmpty {
+            properties["标签"] = ["multi_select": tagsArray]
+        }
         
         return [
             "parent": [
-                "database_id": databaseId
+                "database_id": cleanedDbId
             ],
-            "properties": [
-                "Name": [
-                    "title": [
-                        ["text": ["content": summary.title]]
-                    ]
-                ],
-                "Content": [
-                    "rich_text": [
-                        ["text": ["content": summary.content]]
-                    ]
-                ],
-                "Category": [
-                    "select": ["name": summary.category]
-                ],
-                "Mood": [
-                    "select": ["name": summary.mood]
-                ],
-                "Date": [
-                    "date": ["start": dateString]
-                ],
-                "Status": [
-                    "status": ["name": "New"]
-                ]
-            ]
+            "properties": properties
         ]
     }
 }
