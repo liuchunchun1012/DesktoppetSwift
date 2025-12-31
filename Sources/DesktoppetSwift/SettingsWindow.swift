@@ -47,51 +47,111 @@ class SettingsWindowController {
     }
 }
 
-/// 设置视图
+/// 设置视图 - 侧边栏导航风格
 struct SettingsView: View {
     @StateObject private var settings = UserSettings.shared
-    @State private var selectedTab = 0
+    @State private var selectedSection: SettingsSection = .ai
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            AISettingsTab()
-                .tabItem {
-                    Label("AI 设置", systemImage: "brain")
+        HSplitView {
+            // 侧边栏
+            VStack(spacing: 0) {
+                ForEach(SettingsSection.allCases, id: \.self) { section in
+                    SidebarItem(
+                        section: section,
+                        isSelected: selectedSection == section,
+                        action: { selectedSection = section }
+                    )
                 }
-                .tag(0)
-
-            SystemPromptsTab()
-                .tabItem {
-                    Label("系统提示词", systemImage: "text.bubble")
-                }
-                .tag(1)
-
-            AppearanceSettingsTab()
-                .tabItem {
-                    Label("外观", systemImage: "paintbrush")
-                }
-                .tag(2)
-
-            LanguageSettingsTab()
-                .tabItem {
-                    Label("语言", systemImage: "globe")
-                }
-                .tag(3)
-
-            NotionSettingsTab()
-                .tabItem {
-                    Label("Notion 同步", systemImage: "doc.text")
-                }
-                .tag(4)
-
-            AboutTab()
-                .tabItem {
-                    Label("关于", systemImage: "info.circle")
-                }
-                .tag(5)
+                Spacer()
+            }
+            .frame(width: 160)
+            .background(Color(NSColor.windowBackgroundColor).opacity(0.5))
+            
+            // 详情区域
+            ScrollView {
+                detailView
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+            }
         }
-        .padding()
-        .frame(minWidth: 480, minHeight: 400)
+        .frame(minWidth: 600, minHeight: 450)
+    }
+    
+    // 详情视图
+    @ViewBuilder
+    private var detailView: some View {
+        switch selectedSection {
+        case .ai:
+            AISettingsTab()
+        case .prompts:
+            SystemPromptsTab()
+        case .appearance:
+            AppearanceSettingsTab()
+        case .language:
+            LanguageSettingsTab()
+        case .notion:
+            NotionSettingsTab()
+        case .about:
+            AboutTab()
+        }
+    }
+}
+
+/// 侧边栏项目
+struct SidebarItem: View {
+    let section: SettingsSection
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: section.icon)
+                    .frame(width: 20)
+                Text(section.title)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+    }
+}
+
+/// 设置区域枚举
+enum SettingsSection: String, CaseIterable {
+    case ai
+    case prompts
+    case appearance
+    case language
+    case notion
+    case about
+    
+    var title: String {
+        switch self {
+        case .ai: return "AI 设置"
+        case .prompts: return "系统提示词"
+        case .appearance: return "外观"
+        case .language: return "语言"
+        case .notion: return "Notion 同步"
+        case .about: return "关于"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .ai: return "brain"
+        case .prompts: return "text.bubble"
+        case .appearance: return "paintbrush"
+        case .language: return "globe"
+        case .notion: return "doc.text"
+        case .about: return "info.circle"
+        }
     }
 }
 
@@ -637,13 +697,24 @@ struct NotionSettingsTab: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    // Database ID
+                    // 日志 Database ID
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Database ID")
+                        Text("📓 日志 Database ID")
                             .font(.subheadline)
-                        TextField("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", text: $settings.notionDatabaseId)
+                        TextField("日志数据库 ID", text: $settings.notionDatabaseId)
                             .textFieldStyle(.roundedBorder)
-                        Text("从 Notion 数据库 URL 中复制")
+                        Text("用于保存每日日志总结")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // TodoList Database ID
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("📋 TodoList Database ID")
+                            .font(.subheadline)
+                        TextField("待办数据库 ID", text: $settings.todoListDatabaseId)
+                            .textFieldStyle(.roundedBorder)
+                        Text("用于「记任务：」命令创建任务")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
