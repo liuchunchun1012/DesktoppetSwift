@@ -930,9 +930,95 @@ struct ObsidianSettingsTab: View {
                     }
                 }
                 
+                Divider()
+                
+                // 外部导入
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("导入外部聊天记录")
+                        .font(.headline)
+                    
+                    Text("从其他 AI 客户端导入聊天历史到 Obsidian")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    HStack(spacing: 12) {
+                        ForEach(ChatHistoryImporter.shared.getAvailableSources(), id: \.rawValue) { source in
+                            Button(action: {
+                                importFrom(source: source)
+                            }) {
+                                HStack {
+                                    Image(systemName: source.icon)
+                                    Text(source.rawValue)
+                                }
+                            }
+                            .disabled(settings.obsidianVaultPath.isEmpty || importStatus == .syncing)
+                        }
+                        
+                        if ChatHistoryImporter.shared.getAvailableSources().isEmpty {
+                            Text("未发现可导入的来源")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
+                        
+                        Spacer()
+                        
+                        if importStatus == .syncing {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else if importStatus == .success {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        }
+                    }
+                    
+                    if let message = importMessage {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
                 Spacer()
             }
             .padding()
+        }
+    }
+    
+    @State private var importStatus: SyncStatus = .idle
+    @State private var importMessage: String?
+    
+    private func importFrom(source: ImportSource) {
+        importStatus = .syncing
+        importMessage = "正在导入 \(source.rawValue)..."
+        
+        switch source {
+        case .claudeDesktop:
+            ChatHistoryImporter.shared.importClaudeDesktop { result in
+                handleImportResult(result, source: source)
+            }
+        case .antigravity:
+            ChatHistoryImporter.shared.importAntigravity { result in
+                handleImportResult(result, source: source)
+            }
+        case .cursor:
+            importStatus = .idle
+            importMessage = "Cursor 导入暂未支持"
+        }
+    }
+    
+    private func handleImportResult(_ result: Result<Int, Error>, source: ImportSource) {
+        switch result {
+        case .success(let count):
+            importStatus = .success
+            importMessage = "已导入 \(count) 条 \(source.rawValue) 对话"
+        case .failure(let error):
+            importStatus = .failed
+            importMessage = "导入失败: \(error.localizedDescription)"
+        }
+        
+        // Reset after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            importStatus = .idle
         }
     }
     
