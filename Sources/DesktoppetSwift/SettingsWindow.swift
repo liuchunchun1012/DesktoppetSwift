@@ -536,7 +536,7 @@ struct SystemPromptsTab: View {
                                 .textFieldStyle(.roundedBorder)
                         }
 
-                        Text("💡 这些信息会在聊天窗口标题和提示词中使用")
+                        Text("这些信息会在聊天窗口标题和提示词中使用")
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
@@ -775,7 +775,7 @@ struct NotionSettingsTab: View {
                     
                     // 今日对话统计
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("📊 今日对话")
+                        Text("今日对话")
                             .font(.headline)
                         
                         Text("今天已记录 \(todayLogCount) 条对话")
