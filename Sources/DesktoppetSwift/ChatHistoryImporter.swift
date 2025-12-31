@@ -15,8 +15,8 @@ class ChatHistoryImporter {
         fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects")
     }
     
-    private var antigravityLogsPath: URL {
-        fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/antigravity/brain")
+    private var antigravityConversationsPath: URL {
+        fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/antigravity/conversations")
     }
     
     // MARK: - Public Methods
@@ -56,7 +56,7 @@ class ChatHistoryImporter {
             return
         }
         
-        guard fileManager.fileExists(atPath: antigravityLogsPath.path) else {
+        guard fileManager.fileExists(atPath: antigravityConversationsPath.path) else {
             completion(.failure(ImportError.sourceNotFound("Antigravity")))
             return
         }
@@ -85,7 +85,7 @@ class ChatHistoryImporter {
             sources.append(.claudeDesktop)
         }
         
-        if fileManager.fileExists(atPath: antigravityLogsPath.path) {
+        if fileManager.fileExists(atPath: antigravityConversationsPath.path) {
             sources.append(.antigravity)
         }
         
@@ -160,36 +160,91 @@ class ChatHistoryImporter {
     private func parseAndExportAntigravity() throws -> Int {
         var totalCount = 0
         
-        // 遍历 brain ID 目录
-        let brainDirs = try fileManager.contentsOfDirectory(at: antigravityLogsPath, includingPropertiesForKeys: nil)
+        // 遍历 conversations 目录下的 .pb 文件
+        let pbFiles = try fileManager.contentsOfDirectory(at: antigravityConversationsPath, includingPropertiesForKeys: [.contentModificationDateKey])
+            .filter { $0.pathExtension == "pb" }
         
-        for brainDir in brainDirs {
-            let logsDir = brainDir.appendingPathComponent(".system_generated/logs")
-            guard fileManager.fileExists(atPath: logsDir.path) else { continue }
-            
-            let logFiles = try fileManager.contentsOfDirectory(at: logsDir, includingPropertiesForKeys: nil)
-                .filter { $0.pathExtension == "txt" }
-            
-            for logFile in logFiles {
-                let conversations = try parseAntigravityLog(at: logFile)
-                if !conversations.isEmpty {
-                    try exportToObsidian(conversations: conversations, source: "Antigravity", projectName: logFile.deletingPathExtension().lastPathComponent)
-                    totalCount += conversations.count
-                }
+        for pbFile in pbFiles {
+            let conversations = try parseAntigravityProtobuf(at: pbFile)
+            if !conversations.isEmpty {
+                let sessionId = pbFile.deletingPathExtension().lastPathComponent
+                try exportToObsidian(conversations: conversations, source: "Antigravity", projectName: sessionId)
+                totalCount += conversations.count
             }
         }
         
         return totalCount
     }
     
-    private func parseAntigravityLog(at url: URL) throws -> [(timestamp: Date, user: String, assistant: String)] {
-        let content = try String(contentsOf: url, encoding: .utf8)
+    private func parseAntigravityProtobuf(at url: URL) throws -> [(timestamp: Date, user: String, assistant: String)] {
+        // Read binary data and try to extract readable text
+        let data = try Data(contentsOf: url)
         
-        // Antigravity logs are plain text with conversation summaries
-        // For now, treat each log file as one conversation entry
-        let fileDate = try fileManager.attributesOfItem(atPath: url.path)[.modificationDate] as? Date ?? Date()
+        // Get file modification date as timestamp
+        let attrs = try fileManager.attributesOfItem(atPath: url.path)
+        let fileDate = attrs[.modificationDate] as? Date ?? Date()
         
-        return [(fileDate, "Antigravity Session", content)]
+        // Extract readable strings from protobuf
+        // This is a simplified approach - protobuf embeds strings with length prefixes
+        let textContent = extractTextFromProtobuf(data)
+        
+        guard !textContent.isEmpty else {
+            return []
+        }
+        
+        // Parse the extracted text to find user/assistant pairs
+        return parseConversationText(textContent, date: fileDate)
+    }
+    
+    private func extractTextFromProtobuf(_ data: Data) -> String {
+        // Protobuf stores strings as: field_tag + length + utf8_bytes
+        // We'll try to extract readable UTF-8 strings
+        var strings: [String] = []
+        var index = 0
+        let bytes = [UInt8](data)
+        
+        while index < bytes.count {
+            // Look for potential string starts (printable ASCII or UTF-8)
+            var stringStart = index
+            var validChars = 0
+            
+            while index < bytes.count {
+                let byte = bytes[index]
+                // Check if byte is printable or valid UTF-8
+                if (byte >= 0x20 && byte < 0x7F) || byte >= 0xC0 {
+                    validChars += 1
+                    index += 1
+                } else if validChars > 10 { // Minimum useful string length
+                    break
+                } else {
+                    index += 1
+                    stringStart = index
+                    validChars = 0
+                }
+            }
+            
+            if validChars > 10 {
+                if let str = String(bytes: bytes[stringStart..<index], encoding: .utf8) {
+                    strings.append(str)
+                }
+            }
+            index += 1
+        }
+        
+        return strings.joined(separator: "\n")
+    }
+    
+    private func parseConversationText(_ text: String, date: Date) -> [(timestamp: Date, user: String, assistant: String)] {
+        // Look for patterns that suggest user/assistant turns
+        // This is heuristic-based
+        let lines = text.components(separatedBy: .newlines).filter { !$0.isEmpty }
+        
+        if lines.isEmpty {
+            return []
+        }
+        
+        // Return as single conversation summary
+        return [(date, "Antigravity Session", text.prefix(5000).description)]
     }
     
     // MARK: - Export to Obsidian
