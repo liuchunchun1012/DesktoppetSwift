@@ -604,17 +604,21 @@ extension NotionClient {
             ]
         ]
         
+        // 创建包含时间的日期格式化器
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime]
+        
         // 可选字段：开始时间
         if let startDate = task.startDate {
             properties["开始时间"] = [
-                "date": ["start": ISO8601DateFormatter().string(from: startDate)]
+                "date": ["start": dateFormatter.string(from: startDate)]
             ]
         }
         
-        // 可选字段：截止日期
+        // 可选字段：截止时间
         if let dueDate = task.dueDate {
             properties["截止时间"] = [
-                "date": ["start": ISO8601DateFormatter().string(from: dueDate)]
+                "date": ["start": dateFormatter.string(from: dueDate)]
             ]
         }
         
