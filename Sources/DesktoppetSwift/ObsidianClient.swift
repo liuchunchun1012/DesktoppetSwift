@@ -86,8 +86,10 @@ class ObsidianClient {
     }
     
     private func chatLogFolder() -> String {
-        let folder = UserSettings.shared.obsidianChatLogFolder
-        return folder.isEmpty ? "ChatLogs" : folder
+        let baseFolder = UserSettings.shared.obsidianChatLogFolder
+        let folder = baseFolder.isEmpty ? "ChatLogs" : baseFolder
+        // Add 小猫 subdirectory for consistency with other sources like Claude, Antigravity
+        return folder + "/小猫"
     }
     
     private func todayFileName() -> String {
