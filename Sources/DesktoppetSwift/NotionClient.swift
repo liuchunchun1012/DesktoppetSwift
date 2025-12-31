@@ -228,10 +228,14 @@ class NotionClient {
         }
         
         // 获取今天的日期范围
-        let today = Calendar.current.startOfDay(for: Date())
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+        
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withFullDate]
         let todayString = formatter.string(from: today)
+        let tomorrowString = formatter.string(from: tomorrow)
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -239,11 +243,19 @@ class NotionClient {
         request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // 查询今天的日志
+        // 查询今天的日志（使用日期范围：today <= date < tomorrow）
         let filter: [String: Any] = [
             "filter": [
-                "property": "日期",
-                "date": ["equals": todayString]
+                "and": [
+                    [
+                        "property": "日期",
+                        "date": ["on_or_after": todayString]
+                    ],
+                    [
+                        "property": "日期",
+                        "date": ["before": tomorrowString]
+                    ]
+                ]
             ]
         ]
         
@@ -384,25 +396,15 @@ class NotionClient {
             return
         }
         
-        // 获取今天的日期
-        let today = Calendar.current.startOfDay(for: Date())
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withFullDate]
-        let todayString = formatter.string(from: today)
-        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // 查询今天创建的任务
-        let filter: [String: Any] = [
-            "filter": [
-                "property": "截止日期",
-                "date": ["equals": todayString]
-            ]
-        ]
+        // 查询所有任务（不过滤日期，获取全部任务状态）
+        // 可以在这里加过滤条件，比如只查询未完成的任务
+        let filter: [String: Any] = [:]  // 空 filter = 获取所有任务
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: filter)
