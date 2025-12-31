@@ -66,6 +66,11 @@ class StatusBarController {
         summaryItem.target = self
         menu.addItem(summaryItem)
         
+        // Obsidian Sync
+        let obsidianItem = NSMenuItem(title: "📝 同步到 Obsidian", action: #selector(syncToObsidian), keyEquivalent: "")
+        obsidianItem.target = self
+        menu.addItem(obsidianItem)
+        
         menu.addItem(NSMenuItem.separator())
         
         // Animation submenu
@@ -175,6 +180,31 @@ class StatusBarController {
                     name: .dailySummaryResult,
                     object: nil,
                     userInfo: ["message": "保存失败：\(error.localizedDescription)"]
+                )
+            }
+        }
+    }
+    
+    @objc private func syncToObsidian() {
+        // 检查是否配置了 Obsidian
+        guard UserSettings.shared.obsidianEnabled, ObsidianClient.shared.isConfigured() else {
+            SettingsWindowController.shared.showSettings()
+            return
+        }
+        
+        ObsidianClient.shared.syncTodayChatLogs { result in
+            switch result {
+            case .success(let fileName):
+                NotificationCenter.default.post(
+                    name: .dailySummaryResult,
+                    object: nil,
+                    userInfo: ["message": "📝 已同步到 Obsidian：\(fileName)"]
+                )
+            case .failure(let error):
+                NotificationCenter.default.post(
+                    name: .dailySummaryResult,
+                    object: nil,
+                    userInfo: ["message": "同步失败：\(error.localizedDescription)"]
                 )
             }
         }

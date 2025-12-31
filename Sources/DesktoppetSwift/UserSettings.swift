@@ -23,6 +23,9 @@ class UserSettings: ObservableObject {
         static let notionEnabled = "notionEnabled"
         static let notionDatabaseId = "notionDatabaseId"
         static let todoListDatabaseId = "todoListDatabaseId"
+        static let obsidianEnabled = "obsidianEnabled"
+        static let obsidianVaultPath = "obsidianVaultPath"
+        static let obsidianChatLogFolder = "obsidianChatLogFolder"
     }
     
     // MARK: - Published Properties
@@ -118,6 +121,27 @@ class UserSettings: ObservableObject {
         }
     }
     
+    /// 是否启用 Obsidian 同步
+    @Published var obsidianEnabled: Bool {
+        didSet {
+            defaults.set(obsidianEnabled, forKey: Keys.obsidianEnabled)
+        }
+    }
+    
+    /// Obsidian Vault 路径
+    @Published var obsidianVaultPath: String {
+        didSet {
+            defaults.set(obsidianVaultPath, forKey: Keys.obsidianVaultPath)
+        }
+    }
+    
+    /// Obsidian 聊天记录文件夹
+    @Published var obsidianChatLogFolder: String {
+        didSet {
+            defaults.set(obsidianChatLogFolder, forKey: Keys.obsidianChatLogFolder)
+        }
+    }
+    
     // MARK: - Initialization
     
     private init() {
@@ -170,6 +194,11 @@ class UserSettings: ObservableObject {
         self.notionEnabled = defaults.bool(forKey: Keys.notionEnabled)
         self.notionDatabaseId = defaults.string(forKey: Keys.notionDatabaseId) ?? ""
         self.todoListDatabaseId = defaults.string(forKey: Keys.todoListDatabaseId) ?? ""
+        
+        // 加载 Obsidian 配置
+        self.obsidianEnabled = defaults.bool(forKey: Keys.obsidianEnabled)
+        self.obsidianVaultPath = defaults.string(forKey: Keys.obsidianVaultPath) ?? ""
+        self.obsidianChatLogFolder = defaults.string(forKey: Keys.obsidianChatLogFolder) ?? "ChatLogs"
         
         loadProviderConfigs()
     }

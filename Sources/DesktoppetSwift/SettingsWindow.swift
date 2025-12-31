@@ -92,6 +92,8 @@ struct SettingsView: View {
             LanguageSettingsTab()
         case .notion:
             NotionSettingsTab()
+        case .obsidian:
+            ObsidianSettingsTab()
         case .about:
             AboutTab()
         }
@@ -139,6 +141,7 @@ enum SettingsSection: String, CaseIterable {
     case appearance
     case language
     case notion
+    case obsidian
     case about
     
     var title: String {
@@ -148,6 +151,7 @@ enum SettingsSection: String, CaseIterable {
         case .appearance: return "外观"
         case .language: return "语言"
         case .notion: return "Notion 同步"
+        case .obsidian: return "Obsidian 同步"
         case .about: return "关于"
         }
     }
@@ -159,6 +163,7 @@ enum SettingsSection: String, CaseIterable {
         case .appearance: return "paintbrush"
         case .language: return "globe"
         case .notion: return "doc.text"
+        case .obsidian: return "note.text"
         case .about: return "info.circle"
         }
     }
@@ -828,6 +833,145 @@ struct NotionSettingsTab: View {
             case .failure(let error):
                 connectionStatus = .failed
                 print("[NotionSettings] Failed to post summary: \(error)")
+            }
+        }
+    }
+}
+
+// MARK: - Obsidian Settings Tab
+
+struct ObsidianSettingsTab: View {
+    @StateObject private var settings = UserSettings.shared
+    @State private var syncStatus: SyncStatus = .idle
+    
+    enum SyncStatus {
+        case idle, syncing, success, failed
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // 功能说明
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("📝 Obsidian 同步")
+                        .font(.headline)
+                    
+                    Text("将聊天记录同步到 Obsidian Vault，作为知识库存档。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Divider()
+                
+                // 开关
+                Toggle("启用 Obsidian 同步", isOn: $settings.obsidianEnabled)
+                
+                if settings.obsidianEnabled {
+                    // Vault 路径
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Vault 路径")
+                            .font(.subheadline)
+                        
+                        HStack {
+                            TextField("选择 Obsidian Vault 文件夹", text: $settings.obsidianVaultPath)
+                                .textFieldStyle(.roundedBorder)
+                            
+                            Button("选择...") {
+                                selectVaultFolder()
+                            }
+                        }
+                        
+                        Text("选择你的 Obsidian Vault 根目录")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // 聊天记录文件夹
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("聊天记录文件夹")
+                            .font(.subheadline)
+                        TextField("ChatLogs", text: $settings.obsidianChatLogFolder)
+                            .textFieldStyle(.roundedBorder)
+                        Text("聊天记录将保存在 Vault 的这个文件夹下")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Divider()
+                    
+                    // 操作按钮
+                    HStack {
+                        Button("测试连接") {
+                            testConnection()
+                        }
+                        .disabled(settings.obsidianVaultPath.isEmpty)
+                        
+                        Button("📝 同步今日聊天") {
+                            syncToday()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(settings.obsidianVaultPath.isEmpty || syncStatus == .syncing)
+                        
+                        Spacer()
+                        
+                        switch syncStatus {
+                        case .idle:
+                            EmptyView()
+                        case .syncing:
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        case .success:
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        case .failed:
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding()
+        }
+    }
+    
+    private func selectVaultFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "选择 Obsidian Vault 文件夹"
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.obsidianVaultPath = url.path
+        }
+    }
+    
+    private func testConnection() {
+        syncStatus = .syncing
+        
+        ObsidianClient.shared.testConnection { result in
+            switch result {
+            case .success:
+                syncStatus = .success
+            case .failure:
+                syncStatus = .failed
+            }
+        }
+    }
+    
+    private func syncToday() {
+        syncStatus = .syncing
+        
+        ObsidianClient.shared.syncTodayChatLogs { result in
+            switch result {
+            case .success(let fileName):
+                syncStatus = .success
+                print("[ObsidianSettings] Synced to: \(fileName)")
+            case .failure(let error):
+                syncStatus = .failed
+                print("[ObsidianSettings] Sync failed: \(error)")
             }
         }
     }
