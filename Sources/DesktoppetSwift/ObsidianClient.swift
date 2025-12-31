@@ -155,7 +155,7 @@ class ObsidianClient {
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
         let dateString = formatter.string(from: Date())
         
-        var tagsString = tags.isEmpty ? "" : "tags: [\(tags.joined(separator: ", "))]"
+        let tagsString = tags.isEmpty ? "" : "tags: [\(tags.joined(separator: ", "))]"
         
         return """
         ---
