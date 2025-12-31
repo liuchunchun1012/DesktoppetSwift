@@ -89,21 +89,33 @@ class TaskParser {
     // MARK: - Private Methods
     
     private func buildExtractionPrompt(_ content: String) -> String {
-        let today = ISO8601DateFormatter().string(from: Date()).prefix(10)  // YYYY-MM-DD
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let today = formatter.string(from: Date())
+        
+        formatter.dateFormat = "HH:mm"
+        let now = formatter.string(from: Date())
+        
         return """
 你是一个任务解析助手。请从用户消息中提取所有任务，返回 JSON 数组。
-今天是 \(today)，如果用户没说开始时间，默认用今天。
+今天是 \(today)，当前时间是 \(now)。
+
+时间解析规则：
+- 如果用户说 "10:40-12:40"，startTime=10:40，dueTime=12:40
+- 如果用户说 "明天"，startDate=明天日期
+- 如果用户没说日期，默认今天
+- 如果用户没说时间，默认当前时间
 
 可用选项：
 - priority：高、中、低
 - tags：想法、工作、学习、项目、生活、紧急
 - type：临时任务、番茄钟、每日任务、长期任务
 - status：未开始、进行中、已完成
-- startDate：开始日期（YYYY-MM-DD，默认今天）
-- dueDate：截止日期（YYYY-MM-DD，可选）
+- startDateTime：开始时间（YYYY-MM-DDTHH:mm，如 \(today)T\(now)）
+- dueDateTime：截止时间（YYYY-MM-DDTHH:mm，可选）
 
-返回格式（数组）：
-[{"name":"任务","priority":"中","tags":["工作"],"type":"临时任务","status":"未开始","startDate":"\(today)","dueDate":null}]
+返回格式：
+[{"name":"任务","priority":"中","tags":["工作"],"type":"临时任务","status":"未开始","startDateTime":"\(today)T\(now)","dueDateTime":null}]
 
 用户消息：\(content)
 """
@@ -140,16 +152,18 @@ class TaskParser {
                 let type = json["type"] as? String ?? "临时任务"
                 let status = json["status"] as? String ?? "未开始"
                 
-                let formatter = ISO8601DateFormatter()
-                formatter.formatOptions = [.withFullDate]
+                // 解析日期时间（格式：YYYY-MM-DDTHH:mm）
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+                formatter.timeZone = TimeZone.current
                 
-                var startDate: Date? = Date()  // 默认今天
-                if let startStr = json["startDate"] as? String {
+                var startDate: Date? = Date()  // 默认当前时间
+                if let startStr = json["startDateTime"] as? String {
                     startDate = formatter.date(from: startStr) ?? Date()
                 }
                 
                 var dueDate: Date? = nil
-                if let dueStr = json["dueDate"] as? String {
+                if let dueStr = json["dueDateTime"] as? String {
                     dueDate = formatter.date(from: dueStr)
                 }
                 
