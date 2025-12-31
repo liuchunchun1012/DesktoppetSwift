@@ -61,9 +61,6 @@ Pods/
 硫蠢蠢.md
 *.personal
 
-# OpenSpec (spec-driven development, local only)
-openspec/
-
 # Agent instructions (local only)
 .agent/
 .claude/

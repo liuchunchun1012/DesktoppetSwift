@@ -118,6 +118,9 @@ class AIProviderManager: ObservableObject {
                 // 添加助手回复到历史
                 if case .success(let response) = result {
                     self?.chatHistory.append(["role": "assistant", "content": response])
+                    
+                    // 记录对话到 ChatLogManager（用于每日总结）
+                    ChatLogManager.shared.logConversation(userMessage: message, aiResponse: response)
                 }
                 onComplete(result)
             }

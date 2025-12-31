@@ -20,6 +20,8 @@ class UserSettings: ObservableObject {
         static let petName = "petName"
         static let petNickname = "petNickname"
         static let ownerName = "ownerName"
+        static let notionEnabled = "notionEnabled"
+        static let notionDatabaseId = "notionDatabaseId"
     }
     
     // MARK: - Published Properties
@@ -94,6 +96,20 @@ class UserSettings: ObservableObject {
         }
     }
     
+    /// 是否启用 Notion 同步
+    @Published var notionEnabled: Bool {
+        didSet {
+            defaults.set(notionEnabled, forKey: Keys.notionEnabled)
+        }
+    }
+    
+    /// Notion Database ID
+    @Published var notionDatabaseId: String {
+        didSet {
+            defaults.set(notionDatabaseId, forKey: Keys.notionDatabaseId)
+        }
+    }
+    
     // MARK: - Initialization
     
     private init() {
@@ -141,6 +157,11 @@ class UserSettings: ObservableObject {
 
         // 加载提供商配置
         self.providerConfigs = [:]
+        
+        // 加载 Notion 配置
+        self.notionEnabled = defaults.bool(forKey: Keys.notionEnabled)
+        self.notionDatabaseId = defaults.string(forKey: Keys.notionDatabaseId) ?? ""
+        
         loadProviderConfigs()
     }
     

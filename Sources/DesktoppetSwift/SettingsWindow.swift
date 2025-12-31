@@ -78,11 +78,17 @@ struct SettingsView: View {
                 }
                 .tag(3)
 
+            NotionSettingsTab()
+                .tabItem {
+                    Label("Notion 同步", systemImage: "doc.text")
+                }
+                .tag(4)
+
             AboutTab()
                 .tabItem {
                     Label("关于", systemImage: "info.circle")
                 }
-                .tag(4)
+                .tag(5)
         }
         .padding()
         .frame(minWidth: 480, minHeight: 400)
@@ -586,6 +592,164 @@ struct LanguageSettingsTab: View {
             Spacer()
         }
         .padding()
+    }
+}
+
+// MARK: - Notion Settings Tab
+
+struct NotionSettingsTab: View {
+    @StateObject private var settings = UserSettings.shared
+    @State private var notionToken = ""
+    @State private var connectionStatus: ConnectionStatus = .unknown
+    @State private var todayLogCount = 0
+    
+    enum ConnectionStatus {
+        case unknown, testing, success, failed
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // 功能说明
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("📓 每日总结")
+                        .font(.headline)
+                    
+                    Text("将每天的对话记录生成 AI 总结，保存到 Notion。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Divider()
+                
+                // 开关
+                Toggle("启用 Notion 同步", isOn: $settings.notionEnabled)
+                
+                if settings.notionEnabled {
+                    // Notion Token
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Integration Token")
+                            .font(.subheadline)
+                        SecureField("secret_xxx...", text: $notionToken)
+                            .textFieldStyle(.roundedBorder)
+                        Text("在 Notion 开发者页面创建 Integration 后获取")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Database ID
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Database ID")
+                            .font(.subheadline)
+                        TextField("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", text: $settings.notionDatabaseId)
+                            .textFieldStyle(.roundedBorder)
+                        Text("从 Notion 数据库 URL 中复制")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Divider()
+                    
+                    // 操作按钮
+                    HStack {
+                        Button("保存配置") {
+                            saveConfig()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        
+                        Button("测试连接") {
+                            testConnection()
+                        }
+                        .disabled(connectionStatus == .testing)
+                        
+                        Spacer()
+                        
+                        // 状态指示
+                        switch connectionStatus {
+                        case .unknown:
+                            EmptyView()
+                        case .testing:
+                            ProgressView()
+                                .scaleEffect(0.7)
+                            Text("测试中...")
+                                .foregroundColor(.secondary)
+                        case .success:
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("连接成功")
+                                .foregroundColor(.green)
+                        case .failed:
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
+                            Text("连接失败")
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // 今日对话统计
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("📊 今日对话")
+                            .font(.headline)
+                        
+                        Text("今天已记录 \(todayLogCount) 条对话")
+                            .foregroundColor(.secondary)
+                        
+                        Button("📓 生成今日总结") {
+                            generateSummary()
+                        }
+                        .disabled(todayLogCount == 0)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding()
+        }
+        .onAppear {
+            loadConfig()
+            updateLogCount()
+        }
+    }
+    
+    private func loadConfig() {
+        notionToken = KeychainHelper.shared.getNotionToken() ?? ""
+    }
+    
+    private func saveConfig() {
+        if !notionToken.isEmpty {
+            try? KeychainHelper.shared.saveNotionToken(notionToken)
+        }
+        print("[NotionSettings] Configuration saved")
+    }
+    
+    private func testConnection() {
+        saveConfig()
+        connectionStatus = .testing
+        
+        NotionClient.shared.testConnection { success in
+            connectionStatus = success ? .success : .failed
+        }
+    }
+    
+    private func updateLogCount() {
+        todayLogCount = ChatLogManager.shared.getTodayConversations().count
+    }
+    
+    private func generateSummary() {
+        connectionStatus = .testing
+        
+        DailySummaryGenerator.shared.generateAndPost { result in
+            switch result {
+            case .success:
+                connectionStatus = .success
+                print("[NotionSettings] Daily summary posted successfully!")
+            case .failure(let error):
+                connectionStatus = .failed
+                print("[NotionSettings] Failed to post summary: \(error)")
+            }
+        }
     }
 }
 

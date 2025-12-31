@@ -93,6 +93,25 @@ class KeychainHelper {
     func deleteAPIKey(for provider: AIProviderType) throws {
         try delete(key: KeychainHelper.apiKeyName(for: provider))
     }
+    
+    // MARK: - Notion Token Methods
+    
+    private static let notionTokenKey = "notion_integration_token"
+    
+    /// 保存 Notion Integration Token
+    func saveNotionToken(_ token: String) throws {
+        try save(key: Self.notionTokenKey, value: token)
+    }
+    
+    /// 读取 Notion Integration Token
+    func getNotionToken() -> String? {
+        return read(key: Self.notionTokenKey)
+    }
+    
+    /// 删除 Notion Integration Token
+    func deleteNotionToken() throws {
+        try delete(key: Self.notionTokenKey)
+    }
 }
 
 // MARK: - Keychain Errors (保留兼容性)

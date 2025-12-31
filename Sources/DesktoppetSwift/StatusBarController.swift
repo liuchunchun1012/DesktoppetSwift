@@ -61,6 +61,13 @@ class StatusBarController {
         
         menu.addItem(NSMenuItem.separator())
         
+        // Daily Summary (Notion)
+        let summaryItem = NSMenuItem(title: "📓 今日总结", action: #selector(generateDailySummary), keyEquivalent: "")
+        summaryItem.target = self
+        menu.addItem(summaryItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
         // Animation submenu
         let animMenu = NSMenu()
         animMenu.addItem(createAnimItem("待机舔毛", action: "idle"))
@@ -133,12 +140,52 @@ class StatusBarController {
     @objc private func openSettings() {
         SettingsWindowController.shared.showSettings()
     }
+    
+    @objc private func generateDailySummary() {
+        // 检查是否配置了 Notion
+        guard UserSettings.shared.notionEnabled else {
+            // 打开设置页面
+            SettingsWindowController.shared.showSettings()
+            return
+        }
+        
+        // 检查今天是否有对话
+        let logs = ChatLogManager.shared.getUnsyncedToNotion()
+        guard !logs.isEmpty else {
+            // 发送通知显示提示
+            NotificationCenter.default.post(
+                name: .dailySummaryResult,
+                object: nil,
+                userInfo: ["message": "今天还没有新的对话记录哦！"]
+            )
+            return
+        }
+        
+        // 生成并发送总结
+        DailySummaryGenerator.shared.generateAndPost { result in
+            switch result {
+            case .success(let summary):
+                NotificationCenter.default.post(
+                    name: .dailySummaryResult,
+                    object: nil,
+                    userInfo: ["message": "📓 已保存到 Notion：\(summary.title)"]
+                )
+            case .failure(let error):
+                NotificationCenter.default.post(
+                    name: .dailySummaryResult,
+                    object: nil,
+                    userInfo: ["message": "保存失败：\(error.localizedDescription)"]
+                )
+            }
+        }
+    }
 }
 
 // Notification names
 extension Notification.Name {
     static let setAnimation = Notification.Name("setAnimation")
     static let openChatInput = Notification.Name("openChatInput")
+    static let dailySummaryResult = Notification.Name("dailySummaryResult")
 }
 
 // Input mode enum (shared)
