@@ -26,7 +26,7 @@ class SettingsWindowController {
             defer: false
         )
         
-        newWindow.title = "⚙️ 设置"
+        newWindow.title = "设置"
         newWindow.contentViewController = hostingController
         newWindow.center()
         newWindow.isReleasedWhenClosed = false
