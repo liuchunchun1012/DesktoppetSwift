@@ -146,13 +146,22 @@ class AIProviderManager: ObservableObject {
             return
         }
         
-        onUpdate("📝 正在记录任务...")
+        onUpdate("📝 正在解析并记录任务...")
         
         TaskParser.shared.parseAndCreate(content) { result in
             switch result {
-            case .success(let task):
-                let response = "📝 已记录！\n任务：\(task.name)\n优先级：\(task.priority)\n类型：\(task.type)"
-                onComplete(.success(response))
+            case .success(let tasks):
+                if tasks.count == 1 {
+                    let task = tasks[0]
+                    let response = "📝 已记录！\n任务：\(task.name)\n优先级：\(task.priority)\n类型：\(task.type)"
+                    onComplete(.success(response))
+                } else {
+                    var response = "📝 已记录 \(tasks.count) 个任务！\n"
+                    for (index, task) in tasks.enumerated() {
+                        response += "\n\(index + 1). \(task.name)（\(task.type)）"
+                    }
+                    onComplete(.success(response))
+                }
             case .failure(let error):
                 onComplete(.success("喵呜...记录任务失败了：\(error.localizedDescription)"))
             }

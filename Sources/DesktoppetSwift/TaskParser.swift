@@ -24,39 +24,32 @@ class TaskParser {
         return message
     }
     
-    /// 解析任务并创建到 Notion
-    func parseAndCreate(_ content: String, completion: @escaping (Result<TodoTask, Error>) -> Void) {
-        // 构建 AI prompt
+    /// 解析任务并创建到 Notion（支持一次创建多个任务）
+    func parseAndCreate(_ content: String, completion: @escaping (Result<[TodoTask], Error>) -> Void) {
         let prompt = buildExtractionPrompt(content)
         
-        // 调用 AI 提取结构化信息
         AIProviderManager.shared.chatStream(
             message: prompt,
-            onUpdate: { _ in },  // 不需要流式更新
+            onUpdate: { _ in },
             onComplete: { [weak self] result in
                 switch result {
                 case .success(let response):
-                    if let task = self?.parseAIResponse(response, originalContent: content) {
-                        // 发送到 Notion
-                        NotionClient.shared.createTask(task) { notionResult in
+                    let tasks = self?.parseAIResponseMultiple(response, originalContent: content) ?? []
+                    
+                    if tasks.isEmpty {
+                        // 解析失败，使用原始内容创建一个简单任务
+                        let simpleTask = TodoTask(name: content)
+                        NotionClient.shared.createTask(simpleTask) { notionResult in
                             switch notionResult {
                             case .success:
-                                completion(.success(task))
+                                completion(.success([simpleTask]))
                             case .failure(let error):
                                 completion(.failure(error))
                             }
                         }
                     } else {
-                        // 解析失败，使用原始内容创建简单任务
-                        let simpleTask = TodoTask(name: content)
-                        NotionClient.shared.createTask(simpleTask) { notionResult in
-                            switch notionResult {
-                            case .success:
-                                completion(.success(simpleTask))
-                            case .failure(let error):
-                                completion(.failure(error))
-                            }
-                        }
+                        // 批量创建任务
+                        self?.createTasksSequentially(tasks, completion: completion)
                     }
                 case .failure(let error):
                     completion(.failure(error))
@@ -65,70 +58,122 @@ class TaskParser {
         )
     }
     
+    /// 顺序创建多个任务
+    private func createTasksSequentially(_ tasks: [TodoTask], completion: @escaping (Result<[TodoTask], Error>) -> Void) {
+        var createdTasks: [TodoTask] = []
+        var remainingTasks = tasks
+        
+        func createNext() {
+            guard !remainingTasks.isEmpty else {
+                completion(.success(createdTasks))
+                return
+            }
+            
+            let task = remainingTasks.removeFirst()
+            NotionClient.shared.createTask(task) { result in
+                switch result {
+                case .success:
+                    createdTasks.append(task)
+                    createNext()
+                case .failure(let error):
+                    // 即使某个失败，也继续创建其他的
+                    print("[TaskParser] Failed to create task: \(task.name), error: \(error)")
+                    createNext()
+                }
+            }
+        }
+        
+        createNext()
+    }
+    
     // MARK: - Private Methods
     
     private func buildExtractionPrompt(_ content: String) -> String {
         return """
-你是一个任务解析助手。请从用户消息中提取任务信息，返回 JSON 格式。
-注意：直接返回 JSON，不要用 markdown 代码块包裹。
+你是一个任务解析助手。请从用户消息中提取所有任务，返回 JSON 数组。
+如果用户提到多个任务，请分别提取每一个！
 
 可用选项：
-- priority（优先级）：高、中、低
-- tags（标签）：想法、工作、学习、项目、生活、紧急（可多选）
-- type（类型）：临时任务、番茄钟、每日任务、长期任务
-- status（状态）：未开始、进行中、已完成（根据用户描述判断，默认未开始）
-- dueDate（截止日期）：ISO8601 格式，如 2025-01-01，可选
+- priority：高、中、低
+- tags：想法、工作、学习、项目、生活、紧急（可多选）
+- type：临时任务、番茄钟、每日任务、长期任务
+- status：未开始、进行中、已完成
 
-返回格式：
-{"name": "任务名称", "priority": "中", "tags": ["工作"], "type": "临时任务", "status": "未开始", "dueDate": null}
+返回格式（数组，即使只有一个任务）：
+[{"name":"任务名","priority":"中","tags":["工作"],"type":"临时任务","status":"未开始"}]
 
 用户消息：\(content)
 """
     }
     
-    private func parseAIResponse(_ response: String, originalContent: String) -> TodoTask? {
-        // 尝试提取 JSON
-        guard let jsonStart = response.firstIndex(of: "{"),
-              let jsonEnd = response.lastIndex(of: "}") else {
-            print("[TaskParser] No JSON found in response")
-            return nil
+    /// 解析多个任务
+    private func parseAIResponseMultiple(_ response: String, originalContent: String) -> [TodoTask] {
+        // 尝试找到 JSON 数组
+        guard let jsonStart = response.firstIndex(of: "["),
+              let jsonEnd = response.lastIndex(of: "]") else {
+            // 尝试单个对象格式
+            if let task = parseAIResponseSingle(response, originalContent: originalContent) {
+                return [task]
+            }
+            print("[TaskParser] No JSON array found in response")
+            return []
         }
         
         let jsonString = String(response[jsonStart...jsonEnd])
         
         guard let data = jsonString.data(using: .utf8) else {
             print("[TaskParser] Failed to convert to data")
-            return nil
+            return []
         }
         
         do {
-            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
             
-            let name = json?["name"] as? String ?? originalContent
-            let priority = json?["priority"] as? String ?? "中"
-            let tags = json?["tags"] as? [String] ?? []
-            let type = json?["type"] as? String ?? "临时任务"
-            let status = json?["status"] as? String ?? "未开始"
-            
-            var dueDate: Date? = nil
-            if let dueDateString = json?["dueDate"] as? String {
-                let formatter = ISO8601DateFormatter()
-                formatter.formatOptions = [.withFullDate]
-                dueDate = formatter.date(from: dueDateString)
+            return jsonArray.compactMap { json -> TodoTask? in
+                guard let name = json["name"] as? String, !name.isEmpty else { return nil }
+                
+                let priority = json["priority"] as? String ?? "中"
+                let tags = json["tags"] as? [String] ?? []
+                let type = json["type"] as? String ?? "临时任务"
+                let status = json["status"] as? String ?? "未开始"
+                
+                return TodoTask(
+                    name: name,
+                    priority: priority,
+                    dueDate: nil,
+                    tags: tags,
+                    status: status,
+                    type: type
+                )
             }
-            
-            return TodoTask(
-                name: name,
-                priority: priority,
-                dueDate: dueDate,
-                tags: tags,
-                status: status,
-                type: type
-            )
         } catch {
             print("[TaskParser] JSON parse error: \(error)")
+            return []
+        }
+    }
+    
+    /// 解析单个任务（兼容旧格式）
+    private func parseAIResponseSingle(_ response: String, originalContent: String) -> TodoTask? {
+        guard let jsonStart = response.firstIndex(of: "{"),
+              let jsonEnd = response.lastIndex(of: "}") else {
             return nil
         }
+        
+        let jsonString = String(response[jsonStart...jsonEnd])
+        guard let data = jsonString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let name = json["name"] as? String else {
+            return nil
+        }
+        
+        return TodoTask(
+            name: name,
+            priority: json["priority"] as? String ?? "中",
+            dueDate: nil,
+            tags: json["tags"] as? [String] ?? [],
+            status: json["status"] as? String ?? "未开始",
+            type: json["type"] as? String ?? "临时任务"
+        )
     }
 }
 
