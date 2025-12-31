@@ -159,7 +159,13 @@ class DailySummaryGenerator {
         """ : ""
         
         return """
-        你是一个日记整理助手。请根据今天（\(dateString)）的对话记录，生成一份简短的每日总结。
+        你是一个专业的工作日志整理助手。请根据今天（\(dateString)）的对话记录，提取并整理有价值的信息。
+
+        ⚠️ 重要规则：
+        1. 只记录实际完成的事项、技术细节、想法和决策
+        2. 忽略所有闲聊、情感关怀、喝水提醒等非工作内容
+        3. 内容要具体、详细，包含技术细节和具体成果
+        4. 不要用可爱语气，用简洁专业的记录风格
 
         今日对话记录：
         \(conversationsText)
@@ -168,24 +174,24 @@ class DailySummaryGenerator {
 
         请按以下 JSON 格式输出（只输出 JSON，不要其他文字）：
         {
-            "title": "一句话概括今天最重要的事（不超过30字）",
-            "content": "2-3句话总结今天的主要内容、任务完成情况和心情",
+            "title": "今日核心成就（不超过25字，具体明确）",
+            "content": "详细记录，格式如下：\\n【完成事项】\\n• 事项1：具体做了什么\\n• 事项2：技术细节\\n【灵感/想法】\\n• 想法1\\n【明日计划】\\n• 计划1（可选）",
             "category": "Dev 或 Life 或 Idea 或 Random",
             "mood": "Happy 或 Neutral 或 Frustrated 或 Excited",
-            "highlights": ["成就1", "成就2"]
+            "highlights": ["具体成就1", "具体成就2"]
         }
 
         分类说明：
         - Dev：开发、编程、技术相关
-        - Life：日常生活、情感、健康
+        - Life：日常生活、学习、健康
         - Idea：灵感、想法、创意
-        - Random：其他随机话题
+        - Random：其他话题
 
-        情绪说明：
-        - Happy：开心、满足
-        - Neutral：平静、一般
-        - Frustrated：沮丧、烦躁
-        - Excited：兴奋、激动
+        情绪根据对话整体氛围判断：
+        - Happy：完成目标、解决问题
+        - Neutral：日常进展
+        - Frustrated：遇到困难
+        - Excited：有突破性进展
         """
     }
     
