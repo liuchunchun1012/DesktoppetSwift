@@ -56,16 +56,25 @@ class ChatLogManager: ObservableObject {
         return appFolder
     }
     
-    // 今日日志文件路径
-    private var todayLogURL: URL {
+    // 记录当前加载的日期，用于检测日期变化
+    private var loadedDate: String = ""
+    
+    // 获取今天的日期字符串
+    private var todayDateString: String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
-        let fileName = "chatlog_\(dateFormatter.string(from: Date())).json"
+        return dateFormatter.string(from: Date())
+    }
+    
+    // 今日日志文件路径
+    private var todayLogURL: URL {
+        let fileName = "chatlog_\(todayDateString).json"
         return storageDirectory.appendingPathComponent(fileName)
     }
     
     private init() {
         print("[ChatLogManager] Storage: \(storageDirectory.path)")
+        loadedDate = todayDateString
         loadTodayLogs()
     }
     
@@ -73,6 +82,7 @@ class ChatLogManager: ObservableObject {
     
     /// 记录一次对话
     func logConversation(userMessage: String, aiResponse: String) {
+        checkDateChange()
         let entry = ChatLogEntry(userMessage: userMessage, aiResponse: aiResponse)
         todayLogs.append(entry)
         saveTodayLogs()
@@ -81,12 +91,23 @@ class ChatLogManager: ObservableObject {
     
     /// 获取今日所有对话
     func getTodayConversations() -> [ChatLogEntry] {
+        checkDateChange()
         return todayLogs
     }
     
     /// 获取未同步到 Notion 的对话
     func getUnsyncedToNotion() -> [ChatLogEntry] {
+        checkDateChange()
         return todayLogs.filter { !$0.syncedToNotion }
+    }
+    
+    /// 检查日期是否变化，如果变化则重新加载
+    private func checkDateChange() {
+        if loadedDate != todayDateString {
+            print("[ChatLogManager] Date changed from \(loadedDate) to \(todayDateString), reloading...")
+            loadedDate = todayDateString
+            loadTodayLogs()
+        }
     }
     
     /// 标记对话已同步到 Notion
