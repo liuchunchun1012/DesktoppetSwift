@@ -342,11 +342,11 @@ struct ContentView: View {
         .frame(width: 300, height: 220) // Total window size
         .contextMenu {
                 // AI Features
-                Button("💬 和我聊天") {
+                Button("和我聊天") {
                     inputMode = .chat
                     showInputPopover = true
                 }
-                Button("🌐 翻译") {
+                Button("翻译") {
                     inputMode = .translate
                     showInputPopover = true
                 }

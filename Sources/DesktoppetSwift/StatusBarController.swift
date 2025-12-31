@@ -18,8 +18,14 @@ class StatusBarController {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "cat.fill", accessibilityDescription: "Desktop Pet")
-            button.image?.isTemplate = true
+            // Try to load custom template icon, fallback to SF Symbol
+            if let customIcon = NSImage(named: "menubar_iconTemplate") {
+                button.image = customIcon
+                button.image?.isTemplate = true
+            } else {
+                button.image = NSImage(systemSymbolName: "cat.fill", accessibilityDescription: "Desktop Pet")
+                button.image?.isTemplate = true
+            }
         }
         
         setupMenu()

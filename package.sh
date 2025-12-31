@@ -47,6 +47,13 @@ if [ -f "AppIcon.icns" ]; then
     echo "✅ App icon copied"
 fi
 
+# Copy menu bar template icons
+if [ -f "menubar_iconTemplate.png" ]; then
+    cp menubar_iconTemplate.png "$APP_DIR/Contents/Resources/"
+    cp menubar_iconTemplate@2x.png "$APP_DIR/Contents/Resources/"
+    echo "✅ Menu bar icons copied"
+fi
+
 # 5. Create Info.plist
 echo "Creating Info.plist..."
 cat > "$APP_DIR/Contents/Info.plist" <<EOF
