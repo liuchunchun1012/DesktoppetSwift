@@ -352,25 +352,34 @@ struct ContentView: View {
                 }
                 Divider()
                 
-                // Animation controls
-                Button("待机舔毛") { animator.setAction("idle") }
-                Button("开心跳跃") { animator.setAction("happy_jump") }
-                Button("吃猫粮") { animator.setAction("eating") }
+                // Notion & Obsidian
+                Button("今日总结") {
+                    DailySummaryGenerator.shared.generateAndPost { _ in }
+                }
+                Button("同步到 Obsidian") {
+                    ObsidianClient.shared.syncTodayChatLogs { _ in }
+                }
                 Divider()
-                Menu("休息") {
+                
+                // Animation controls - all in submenu
+                Menu("切换动作") {
+                    Button("待机舔毛") { animator.setAction("idle") }
+                    Button("开心跳跃") { animator.setAction("happy_jump") }
+                    Button("吃猫粮") { animator.setAction("eating") }
+                    Divider()
                     Button("准备睡觉") { animator.setAction("rest_prepare") }
                     Button("睡觉中") { animator.setAction("rest_sleeping") }
                     Button("起床") { animator.setAction("rest_wakeup") }
-                }
-                Menu("走路") {
+                    Divider()
                     Button("向左走") { animator.setAction("walk_left") }
                     Button("向右走") { animator.setAction("walk_right") }
                     Button("向上走") { animator.setAction("walk_up") }
                     Button("向下走") { animator.setAction("walk_down") }
                 }
-                Menu("互动") {
-                    Button("翻肚皮") { animator.setAction("interact_belly") }
-                    Button("拒绝") { animator.setAction("interact_refuse") }
+                
+                Divider()
+                Button("设置...") {
+                    SettingsWindowController.shared.showSettings()
                 }
         }
         .popover(isPresented: $showInputPopover) {
