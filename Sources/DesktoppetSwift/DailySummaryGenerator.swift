@@ -7,7 +7,7 @@ class DailySummaryGenerator {
     
     private init() {}
     
-    /// 生成今日总结并发送到 Notion
+    /// 生成今日总结并发送到 Notion（支持合并和 TodoList 整合）
     func generateAndPost(completion: @escaping (Result<DailySummary, Error>) -> Void) {
         let logs = ChatLogManager.shared.getUnsyncedToNotion()
         
@@ -16,36 +16,65 @@ class DailySummaryGenerator {
             return
         }
         
-        // 构建 AI 提示词
-        let prompt = buildPrompt(from: logs)
-        
-        // 调用 AI 生成结构化总结
-        AIProviderManager.shared.chatStream(
-            message: prompt,
-            onUpdate: { _ in },  // 不需要流式更新
-            onComplete: { [weak self] result in
-                switch result {
-                case .success(let response):
-                    if let summary = self?.parseResponse(response) {
-                        // 发送到 Notion
-                        NotionClient.shared.postDailySummary(summary) { notionResult in
-                            switch notionResult {
-                            case .success:
-                                // 标记对话已同步
-                                ChatLogManager.shared.markSyncedToNotion()
-                                completion(.success(summary))
-                            case .failure(let error):
-                                completion(.failure(error))
+        // Step 1: 查询 TodoList 任务
+        NotionClient.shared.queryTodayTasks { [weak self] tasksResult in
+            let tasks = (try? tasksResult.get()) ?? []
+            
+            // Step 2: 查询是否已有今日日志
+            NotionClient.shared.queryTodayLog { existingLogResult in
+                let existingLog = try? existingLogResult.get()
+                
+                // Step 3: 构建 AI 提示词（包含任务信息）
+                let prompt = self?.buildPromptWithTasks(from: logs, tasks: tasks, existingContent: existingLog?.content) ?? ""
+                
+                // Step 4: 调用 AI 生成总结
+                AIProviderManager.shared.chatStream(
+                    message: prompt,
+                    onUpdate: { _ in },
+                    onComplete: { [weak self] result in
+                        switch result {
+                        case .success(let response):
+                            if let summary = self?.parseResponse(response) {
+                                // Step 5: 根据是否有现有日志决定更新还是创建
+                                if let existingPage = existingLog {
+                                    // 更新现有日志
+                                    print("[DailySummaryGenerator] Updating existing log: \(existingPage.id)")
+                                    NotionClient.shared.updatePageContent(
+                                        pageId: existingPage.id,
+                                        newContent: summary.content,
+                                        newTags: summary.highlights
+                                    ) { updateResult in
+                                        switch updateResult {
+                                        case .success:
+                                            ChatLogManager.shared.markSyncedToNotion()
+                                            completion(.success(summary))
+                                        case .failure(let error):
+                                            completion(.failure(error))
+                                        }
+                                    }
+                                } else {
+                                    // 创建新日志
+                                    print("[DailySummaryGenerator] Creating new log")
+                                    NotionClient.shared.postDailySummary(summary) { notionResult in
+                                        switch notionResult {
+                                        case .success:
+                                            ChatLogManager.shared.markSyncedToNotion()
+                                            completion(.success(summary))
+                                        case .failure(let error):
+                                            completion(.failure(error))
+                                        }
+                                    }
+                                }
+                            } else {
+                                completion(.failure(SummaryError.parseError))
                             }
+                        case .failure(let error):
+                            completion(.failure(error))
                         }
-                    } else {
-                        completion(.failure(SummaryError.parseError))
                     }
-                case .failure(let error):
-                    completion(.failure(error))
-                }
+                )
             }
-        )
+        }
     }
     
     /// 仅生成总结（不发送到 Notion）
@@ -79,12 +108,14 @@ class DailySummaryGenerator {
     
     // MARK: - Private Methods
     
-    private func buildPrompt(from logs: [ChatLogEntry]) -> String {
+    /// 构建包含任务信息的 AI 提示词
+    private func buildPromptWithTasks(from logs: [ChatLogEntry], tasks: [TaskSummaryItem], existingContent: String?) -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "zh_CN")
         dateFormatter.dateFormat = "yyyy年MM月dd日"
         let dateString = dateFormatter.string(from: Date())
         
+        // 构建对话文本
         var conversationsText = ""
         for (index, log) in logs.enumerated() {
             let timeFormatter = DateFormatter()
@@ -99,16 +130,46 @@ class DailySummaryGenerator {
             """
         }
         
+        // 构建任务文本
+        var tasksText = ""
+        if !tasks.isEmpty {
+            let completed = tasks.filter { $0.status == "已完成" }
+            let inProgress = tasks.filter { $0.status == "进行中" }
+            let pending = tasks.filter { $0.status == "未开始" }
+            
+            if !completed.isEmpty {
+                tasksText += "✅ 已完成：" + completed.map { $0.name }.joined(separator: "、") + "\n"
+            }
+            if !inProgress.isEmpty {
+                tasksText += "🔄 进行中：" + inProgress.map { $0.name }.joined(separator: "、") + "\n"
+            }
+            if !pending.isEmpty {
+                tasksText += "📋 待办：" + pending.map { $0.name }.joined(separator: "、") + "\n"
+            }
+        }
+        
+        // 是否需要合并提示
+        let mergeHint = existingContent != nil ? """
+        
+        注意：这是今天的第二次总结，请整合以下之前的内容：
+        ---
+        \(existingContent ?? "")
+        ---
+        请生成一个整合后的完整总结，保留之前的重要信息并加入新内容。
+        """ : ""
+        
         return """
         你是一个日记整理助手。请根据今天（\(dateString)）的对话记录，生成一份简短的每日总结。
 
         今日对话记录：
         \(conversationsText)
+        \(tasksText.isEmpty ? "" : "\n今日任务完成情况：\n\(tasksText)")
+        \(mergeHint)
 
         请按以下 JSON 格式输出（只输出 JSON，不要其他文字）：
         {
             "title": "一句话概括今天最重要的事（不超过30字）",
-            "content": "2-3句话总结今天的主要内容和心情",
+            "content": "2-3句话总结今天的主要内容、任务完成情况和心情",
             "category": "Dev 或 Life 或 Idea 或 Random",
             "mood": "Happy 或 Neutral 或 Frustrated 或 Excited",
             "highlights": ["成就1", "成就2"]
@@ -126,6 +187,10 @@ class DailySummaryGenerator {
         - Frustrated：沮丧、烦躁
         - Excited：兴奋、激动
         """
+    }
+    
+    private func buildPrompt(from logs: [ChatLogEntry]) -> String {
+        return buildPromptWithTasks(from: logs, tasks: [], existingContent: nil)
     }
     
     private func parseResponse(_ response: String) -> DailySummary? {

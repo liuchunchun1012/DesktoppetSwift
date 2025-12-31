@@ -104,22 +104,31 @@ struct SidebarItem: View {
     let isSelected: Bool
     let action: () -> Void
     
+    @State private var isHovered = false
+    
     var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: section.icon)
-                    .frame(width: 20)
-                Text(section.title)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
-            .cornerRadius(6)
+        HStack {
+            Image(systemName: section.icon)
+                .frame(width: 20)
+            Text(section.title)
+            Spacer()
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isSelected ? Color.accentColor.opacity(0.25) : (isHovered ? Color.gray.opacity(0.15) : Color.clear))
+        )
+        .contentShape(Rectangle()) // 确保整个区域可点击
+        .onTapGesture {
+            action()
+        }
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .padding(.horizontal, 8)
-        .padding(.vertical, 2)
+        .padding(.vertical, 1)
     }
 }
 

@@ -205,6 +205,275 @@ class NotionClient {
             "properties": properties
         ]
     }
+    
+    // MARK: - Database Query Methods
+    
+    /// 查询今日日志（用于合并）
+    func queryTodayLog(completion: @escaping (Result<ExistingLogPage?, Error>) -> Void) {
+        guard let apiKey = KeychainHelper.shared.getNotionToken(), !apiKey.isEmpty else {
+            completion(.failure(NotionError.notConfigured))
+            return
+        }
+        
+        let databaseId = UserSettings.shared.notionDatabaseId
+        guard !databaseId.isEmpty else {
+            completion(.failure(NotionError.noDatabaseId))
+            return
+        }
+        
+        let cleanedDbId = cleanDatabaseId(databaseId)
+        guard let url = URL(string: "\(baseURL)/databases/\(cleanedDbId)/query") else {
+            completion(.failure(NotionError.invalidURL))
+            return
+        }
+        
+        // 获取今天的日期范围
+        let today = Calendar.current.startOfDay(for: Date())
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+        let todayString = formatter.string(from: today)
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // 查询今天的日志
+        let filter: [String: Any] = [
+            "filter": [
+                "property": "日期",
+                "date": ["equals": todayString]
+            ]
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: filter)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+        
+        print("[NotionClient] Querying today's log for date: \(todayString)")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async { completion(.success(nil)) }
+                return
+            }
+            
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let results = json["results"] as? [[String: Any]],
+                   let firstResult = results.first {
+                    
+                    let pageId = firstResult["id"] as? String ?? ""
+                    var existingContent = ""
+                    
+                    // 提取现有内容
+                    if let properties = firstResult["properties"] as? [String: Any],
+                       let contentProp = properties["内容"] as? [String: Any],
+                       let richText = contentProp["rich_text"] as? [[String: Any]],
+                       let firstText = richText.first,
+                       let textObj = firstText["text"] as? [String: Any],
+                       let content = textObj["content"] as? String {
+                        existingContent = content
+                    }
+                    
+                    print("[NotionClient] Found existing log: \(pageId)")
+                    let page = ExistingLogPage(id: pageId, content: existingContent)
+                    DispatchQueue.main.async { completion(.success(page)) }
+                } else {
+                    print("[NotionClient] No existing log found for today")
+                    DispatchQueue.main.async { completion(.success(nil)) }
+                }
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }.resume()
+    }
+    
+    /// 更新现有日志页面（追加内容）
+    func updatePageContent(pageId: String, newContent: String, newTags: [String], completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let apiKey = KeychainHelper.shared.getNotionToken(), !apiKey.isEmpty else {
+            completion(.failure(NotionError.notConfigured))
+            return
+        }
+        
+        guard let url = URL(string: "\(baseURL)/pages/\(pageId)") else {
+            completion(.failure(NotionError.invalidURL))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // 构建标签数组
+        var tagsArray: [[String: Any]] = []
+        for tag in newTags {
+            tagsArray.append(["name": tag])
+        }
+        
+        var properties: [String: Any] = [
+            "内容": [
+                "rich_text": [
+                    ["text": ["content": newContent]]
+                ]
+            ]
+        ]
+        
+        if !tagsArray.isEmpty {
+            properties["标签"] = ["multi_select": tagsArray]
+        }
+        
+        let body: [String: Any] = ["properties": properties]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            print("[NotionClient] Updating page: \(pageId)")
+        } catch {
+            completion(.failure(error))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                if (200...299).contains(httpResponse.statusCode) {
+                    print("[NotionClient] Page updated successfully!")
+                    DispatchQueue.main.async { completion(.success(())) }
+                } else {
+                    let errorMessage = data.flatMap { String(data: $0, encoding: .utf8) } ?? "Unknown error"
+                    print("[NotionClient] Update error: \(httpResponse.statusCode) - \(errorMessage)")
+                    DispatchQueue.main.async {
+                        completion(.failure(NotionError.apiError(httpResponse.statusCode, errorMessage)))
+                    }
+                }
+            }
+        }.resume()
+    }
+    
+    /// 查询今日 TodoList 任务
+    func queryTodayTasks(completion: @escaping (Result<[TaskSummaryItem], Error>) -> Void) {
+        guard let apiKey = KeychainHelper.shared.getNotionToken(), !apiKey.isEmpty else {
+            completion(.success([]))  // 没有配置时返回空数组
+            return
+        }
+        
+        let databaseId = UserSettings.shared.todoListDatabaseId
+        guard !databaseId.isEmpty else {
+            completion(.success([]))  // 没有配置 TodoList 时返回空数组
+            return
+        }
+        
+        let cleanedDbId = cleanDatabaseId(databaseId)
+        guard let url = URL(string: "\(baseURL)/databases/\(cleanedDbId)/query") else {
+            completion(.failure(NotionError.invalidURL))
+            return
+        }
+        
+        // 获取今天的日期
+        let today = Calendar.current.startOfDay(for: Date())
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+        let todayString = formatter.string(from: today)
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // 查询今天创建的任务
+        let filter: [String: Any] = [
+            "filter": [
+                "property": "截止日期",
+                "date": ["equals": todayString]
+            ]
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: filter)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+        
+        print("[NotionClient] Querying today's tasks")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async { completion(.success([])) }
+                return
+            }
+            
+            do {
+                var tasks: [TaskSummaryItem] = []
+                
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let results = json["results"] as? [[String: Any]] {
+                    
+                    for result in results {
+                        if let properties = result["properties"] as? [String: Any] {
+                            // 提取任务名称
+                            var name = "未命名任务"
+                            if let titleProp = properties["任务名称"] as? [String: Any],
+                               let titleArr = titleProp["title"] as? [[String: Any]],
+                               let firstTitle = titleArr.first,
+                               let textObj = firstTitle["text"] as? [String: Any],
+                               let content = textObj["content"] as? String {
+                                name = content
+                            }
+                            
+                            // 提取状态
+                            var status = "未开始"
+                            if let statusProp = properties["状态"] as? [String: Any],
+                               let statusObj = statusProp["status"] as? [String: Any],
+                               let statusName = statusObj["name"] as? String {
+                                status = statusName
+                            }
+                            
+                            tasks.append(TaskSummaryItem(name: name, status: status))
+                        }
+                    }
+                }
+                
+                print("[NotionClient] Found \(tasks.count) tasks for today")
+                DispatchQueue.main.async { completion(.success(tasks)) }
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }.resume()
+    }
+}
+
+/// 现有日志页面
+struct ExistingLogPage {
+    let id: String
+    let content: String
+}
+
+/// 任务摘要项（用于日志整合）
+struct TaskSummaryItem {
+    let name: String
+    let status: String  // 未开始 / 进行中 / 已完成
 }
 
 /// 每日总结数据结构
