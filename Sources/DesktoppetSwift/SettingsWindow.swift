@@ -686,7 +686,7 @@ struct NotionSettingsTab: View {
             VStack(alignment: .leading, spacing: 16) {
                 // 功能说明
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("📓 每日总结")
+                    Text("每日总结")
                         .font(.headline)
                     
                     Text("将每天的对话记录生成 AI 总结，保存到 Notion。")
@@ -713,7 +713,7 @@ struct NotionSettingsTab: View {
                     
                     // 日志 Database ID
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("📓 日志 Database ID")
+                        Text("日志 Database ID")
                             .font(.subheadline)
                         TextField("日志数据库 ID", text: $settings.notionDatabaseId)
                             .textFieldStyle(.roundedBorder)
@@ -724,7 +724,7 @@ struct NotionSettingsTab: View {
                     
                     // TodoList Database ID
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("📋 TodoList Database ID")
+                        Text("TodoList Database ID")
                             .font(.subheadline)
                         TextField("待办数据库 ID", text: $settings.todoListDatabaseId)
                             .textFieldStyle(.roundedBorder)
@@ -781,7 +781,7 @@ struct NotionSettingsTab: View {
                         Text("今天已记录 \(todayLogCount) 条对话")
                             .foregroundColor(.secondary)
                         
-                        Button("📓 生成今日总结") {
+                        Button("生成今日总结") {
                             generateSummary()
                         }
                         .disabled(todayLogCount == 0)
@@ -853,7 +853,7 @@ struct ObsidianSettingsTab: View {
             VStack(alignment: .leading, spacing: 16) {
                 // 功能说明
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("📝 Obsidian 同步")
+                    Text("Obsidian 同步")
                         .font(.headline)
                     
                     Text("将聊天记录同步到 Obsidian Vault，作为知识库存档。")
@@ -906,7 +906,7 @@ struct ObsidianSettingsTab: View {
                         }
                         .disabled(settings.obsidianVaultPath.isEmpty)
                         
-                        Button("📝 同步今日聊天") {
+                        Button("同步今日聊天") {
                             syncToday()
                         }
                         .buttonStyle(.borderedProminent)

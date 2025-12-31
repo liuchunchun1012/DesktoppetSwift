@@ -126,7 +126,7 @@ class ObsidianClient {
         tags: [ai, chat, 小猫]
         ---
 
-        # 🐱 小猫聊天记录 - \(dateString)
+        # 小猫聊天记录 - \(dateString)
 
         """
         

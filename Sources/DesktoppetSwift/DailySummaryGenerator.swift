@@ -138,13 +138,13 @@ class DailySummaryGenerator {
             let pending = tasks.filter { $0.status == "未开始" }
             
             if !completed.isEmpty {
-                tasksText += "✅ 已完成：" + completed.map { $0.name }.joined(separator: "、") + "\n"
+                tasksText += "已完成：" + completed.map { $0.name }.joined(separator: "、") + "\n"
             }
             if !inProgress.isEmpty {
-                tasksText += "🔄 进行中：" + inProgress.map { $0.name }.joined(separator: "、") + "\n"
+                tasksText += "进行中：" + inProgress.map { $0.name }.joined(separator: "、") + "\n"
             }
             if !pending.isEmpty {
-                tasksText += "📋 待办：" + pending.map { $0.name }.joined(separator: "、") + "\n"
+                tasksText += "待办：" + pending.map { $0.name }.joined(separator: "、") + "\n"
             }
         }
         

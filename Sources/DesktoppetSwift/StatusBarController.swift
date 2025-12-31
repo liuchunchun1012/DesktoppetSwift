@@ -190,7 +190,7 @@ class StatusBarController {
                 NotificationCenter.default.post(
                     name: .dailySummaryResult,
                     object: nil,
-                    userInfo: ["message": "📓 已保存到 Notion：\(summary.title)"]
+                    userInfo: ["message": "已保存到 Notion：\(summary.title)"]
                 )
             case .failure(let error):
                 NotificationCenter.default.post(
@@ -215,7 +215,7 @@ class StatusBarController {
                 NotificationCenter.default.post(
                     name: .dailySummaryResult,
                     object: nil,
-                    userInfo: ["message": "📝 已同步到 Obsidian：\(fileName)"]
+                    userInfo: ["message": "已同步到 Obsidian：\(fileName)"]
                 )
             case .failure(let error):
                 NotificationCenter.default.post(

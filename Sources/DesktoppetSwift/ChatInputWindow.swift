@@ -40,11 +40,11 @@ class ChatInputWindow: NSObject, NSWindowDelegate {
         var title: String
         switch mode {
         case .chat:
-            title = "🐱 和\(UserSettings.shared.petNickname)聊天"
+            title = "和\(UserSettings.shared.petNickname)聊天"
         case .translate:
-            title = "🌐 翻译"
+            title = "翻译"
         case .imageQuestion:
-            title = "📸 问问\(UserSettings.shared.petNickname)"
+            title = "问问\(UserSettings.shared.petNickname)"
         }
         
         panel.title = title
