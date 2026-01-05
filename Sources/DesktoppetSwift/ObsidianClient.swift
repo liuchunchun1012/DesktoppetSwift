@@ -36,15 +36,22 @@ class ObsidianClient {
     }
     
     /// 写入任意内容到 Obsidian
-    func writeNote(title: String, content: String, folder: String? = nil, tags: [String] = [], completion: @escaping (Result<Void, Error>) -> Void) {
+    func writeNote(title: String, content: String, folder: String? = nil, tags: [String] = [], customFileName: String? = nil, completion: @escaping (Result<Void, Error>) -> Void) {
         guard isConfigured() else {
             completion(.failure(ObsidianError.notConfigured))
             return
         }
         
-        let frontmatter = buildFrontmatter(tags: tags)
-        let fullContent = "\(frontmatter)\n\n# \(title)\n\n\(content)"
-        let fileName = sanitizeFileName(title) + ".md"
+        // 如果传入了完整内容（已包含 frontmatter），直接使用
+        let fullContent: String
+        if content.hasPrefix("---") {
+            fullContent = content
+        } else {
+            let frontmatter = buildFrontmatter(tags: tags)
+            fullContent = "\(frontmatter)\n\n# \(title)\n\n\(content)"
+        }
+        
+        let fileName = customFileName ?? (sanitizeFileName(title) + ".md")
         
         do {
             try writeToVault(content: fullContent, fileName: fileName, folder: folder)
@@ -77,6 +84,119 @@ class ObsidianClient {
         } catch {
             completion(.failure(ObsidianError.writeError(error.localizedDescription)))
         }
+    }
+    /// 快速保存内容到 Obsidian
+    /// - Parameters:
+    ///   - content: 要保存的内容
+    ///   - title: 可选标题，默认使用时间戳
+    func quickSave(content: String, title: String? = nil, completion: @escaping (Result<String, Error>) -> Void) {
+        guard isConfigured() else {
+            completion(.failure(ObsidianError.notConfigured))
+            return
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let timestamp = formatter.string(from: Date())
+        
+        let noteTitle = title ?? "快速笔记 - \(timestamp)"
+        let fileName = sanitizeFileName(noteTitle) + ".md"
+        
+        let markdown = """
+        ---
+        created: \(timestamp)
+        tags: [小猫, quick-note]
+        ---
+        
+        # \(noteTitle)
+        
+        \(content)
+        """
+        
+        do {
+            try writeToVault(content: markdown, fileName: fileName, folder: quickSaveFolder())
+            print("[ObsidianClient] Quick saved: \(fileName)")
+            completion(.success(fileName))
+        } catch {
+            completion(.failure(error))
+        }
+    }
+    
+    /// 快速保存内容到 Obsidian（包含图片）
+    /// - Parameters:
+    ///   - content: 要保存的 Markdown 内容
+    ///   - imageBase64: 图片的 Base64 编码
+    ///   - title: 可选标题
+    func quickSaveWithImage(content: String, imageBase64: String, title: String? = nil, completion: @escaping (Result<String, Error>) -> Void) {
+        guard isConfigured() else {
+            completion(.failure(ObsidianError.notConfigured))
+            return
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let timestamp = formatter.string(from: Date())
+        
+        let noteTitle = title ?? "快速笔记 - \(timestamp)"
+        let mdFileName = sanitizeFileName(noteTitle) + ".md"
+        let imageFileName = sanitizeFileName(noteTitle) + ".png"
+        let imageSubfolder = "quickscreenshots"
+        
+        // 保存图片文件到子文件夹
+        do {
+            // 确保子文件夹路径: quickSaveRoot/quickscreenshots/
+            let fullImageFolder = (quickSaveFolder() as NSString).appendingPathComponent(imageSubfolder)
+            try saveImage(base64: imageBase64, fileName: imageFileName, folder: fullImageFolder)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+        
+        // 在 markdown 中嵌入图片引用 (使用 Obsidian Wiki Link 格式)
+        let markdown = """
+        ---
+        created: \(timestamp)
+        tags: [小猫, quick-note, image]
+        ---
+        
+        # \(noteTitle)
+        
+        \(content)
+        
+        ![[\(imageSubfolder)/\(imageFileName)]]
+        """
+        
+        do {
+            try writeToVault(content: markdown, fileName: mdFileName, folder: quickSaveFolder())
+            print("[ObsidianClient] Quick saved with image: \(mdFileName)")
+            completion(.success(mdFileName))
+        } catch {
+            completion(.failure(error))
+        }
+    }
+    
+    /// 保存 Base64 图片到 Vault
+    private func saveImage(base64: String, fileName: String, folder: String) throws {
+        guard let imageData = Data(base64Encoded: base64) else {
+            throw ObsidianError.writeError("无法解码图片数据")
+        }
+        
+        var targetURL = vaultURL()
+        if !folder.isEmpty {
+            targetURL = targetURL.appendingPathComponent(folder)
+            if !fileManager.fileExists(atPath: targetURL.path) {
+                try fileManager.createDirectory(at: targetURL, withIntermediateDirectories: true)
+            }
+        }
+        
+        let fileURL = targetURL.appendingPathComponent(fileName)
+        try imageData.write(to: fileURL)
+        print("[ObsidianClient] Saved image: \(fileURL.path)")
+    }
+    
+    private func quickSaveFolder() -> String {
+        let folder = UserSettings.shared.obsidianQuickSaveFolder
+        return folder.isEmpty ? "QuickNotes" : folder
     }
     
     // MARK: - Private Methods

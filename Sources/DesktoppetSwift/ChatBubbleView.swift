@@ -8,6 +8,8 @@ struct ChatBubbleView: View {
     let onHover: (Bool) -> Void
     
     @State private var isHovering = false
+    @State private var showSaveSuccess = false
+    @State private var saveError: String?
     
     // Tuxedo cat color palette
     private let bubbleBackground = Color(red: 1.0, green: 0.98, blue: 0.95) // Warm cream
@@ -17,42 +19,56 @@ struct ChatBubbleView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Bubble content
-            VStack(alignment: .leading, spacing: 4) {
-                if isLoading && message.isEmpty {
-                    HStack(spacing: 8) {
-                        // Cute paw loading indicator
-                        Text("🐾")
-                            .font(.system(size: 14))
-                            .opacity(0.8)
-                        Text("喵喵思考中...")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(accentColor)
-                    }
-                } else {
-                    ScrollView {
-                        Text(message)
-                            .font(.system(size: 13, weight: .regular, design: .rounded))
-                            .foregroundColor(textColor)
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+            // Bubble content with save button overlay
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if isLoading && message.isEmpty {
+                        HStack(spacing: 8) {
+                            // Cute paw loading indicator
+                            Text("🐾")
+                                .font(.system(size: 14))
+                                .opacity(0.8)
+                            Text("喵喵思考中...")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(accentColor)
+                        }
+                    } else {
+                        ScrollView {
+                            Text(message)
+                                .font(.system(size: 13, weight: .regular, design: .rounded))
+                                .foregroundColor(textColor)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .frame(width: 200)
+                .frame(minHeight: 44, maxHeight: 300)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(bubbleBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(borderColor, lineWidth: 1.5)
+                )
+                .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+                
+                // Save to Obsidian button - shows on hover
+                if isHovering && !message.isEmpty && !isLoading {
+                    saveButton
+                        .padding(6)
+                }
+                
+                // Save success indicator
+                if showSaveSuccess {
+                    saveSuccessIndicator
+                        .padding(6)
+                }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(width: 200)
-            .frame(minHeight: 44, maxHeight: 300)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(bubbleBackground)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(borderColor, lineWidth: 1.5)
-            )
-            .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
             
             // Cute rounded triangle pointer
             CatBubblePointer()
@@ -63,6 +79,81 @@ struct ChatBubbleView: View {
         .onHover { hovering in
             isHovering = hovering
             onHover(hovering)
+        }
+    }
+    
+    /// Save button - simple icon matching bubble style
+    private var saveButton: some View {
+        Button(action: saveToObsidian) {
+            Image(systemName: "square.and.arrow.down")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(accentColor)
+        }
+        .buttonStyle(.plain)
+        .help("保存到 Obsidian")
+    }
+    
+    /// Success indicator - simple checkmark
+    private var saveSuccessIndicator: some View {
+        Image(systemName: "checkmark")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(accentColor)
+    }
+    
+    /// Save current message to Obsidian
+    private func saveToObsidian() {
+        guard ObsidianClient.shared.isConfigured() else {
+            // Show error tip
+            ChatState.shared.chatMessage = "请先在设置中配置 Obsidian Vault 路径"
+            return
+        }
+        
+        // 构建完整对话内容
+        let userMessage = ChatState.shared.lastUserMessage
+        let aiResponse = message
+        let imageBase64 = ChatState.shared.lastImageBase64
+        
+        var fullContent = """
+        ## 我的问题
+        
+        \(userMessage)
+        
+        ## 小猫回答
+        
+        \(aiResponse)
+        """
+        
+        // 保存的回调处理
+        let handleResult: (Result<String, Error>) -> Void = { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let fileName):
+                    // Show success indicator briefly
+                    self.showSaveSuccess = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        self.showSaveSuccess = false
+                    }
+                    print("[ChatBubbleView] Saved to Obsidian: \(fileName)")
+                    
+                case .failure(let error):
+                    self.saveError = error.localizedDescription
+                    ChatState.shared.chatMessage = "保存失败: \(error.localizedDescription)"
+                }
+            }
+        }
+        
+        // 如果有图片，使用带图片的保存方法
+        if let imageData = imageBase64 {
+            ObsidianClient.shared.quickSaveWithImage(
+                content: fullContent,
+                imageBase64: imageData,
+                completion: handleResult
+            )
+        } else {
+            ObsidianClient.shared.quickSave(
+                content: fullContent,
+                completion: handleResult
+            )
         }
     }
 }
@@ -141,24 +232,60 @@ struct Triangle: Shape {
 }
 
 /// Input popover for chat/translate
+/// Input popover for chat/translate
 struct ChatInputView: View {
     @Binding var isPresented: Bool
     @Binding var inputText: String
     let placeholder: String
     let onSubmit: (String) -> Void
     
+    @StateObject private var speechRecognizer = SpeechRecognizer()
+    
     var body: some View {
         VStack(spacing: 12) {
-            TextField(placeholder, text: $inputText)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 13))
-                .frame(width: 200)
-                .onSubmit {
-                    submitIfNotEmpty()
+            // Unified Input Container
+            HStack(spacing: 0) {
+                TextField(placeholder, text: $inputText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .frame(height: 24)
+                    .padding(.leading, 12)
+                    .onSubmit {
+                        submitIfNotEmpty()
+                    }
+                    .onChange(of: speechRecognizer.recognizedText) { newValue in
+                        if !newValue.isEmpty {
+                            inputText = newValue
+                        }
+                    }
+                
+                // Mic Button
+                Button(action: {
+                    speechRecognizer.toggleRecording()
+                }) {
+                    Image(systemName: speechRecognizer.isRecording ? "mic.circle.fill" : "mic.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(speechRecognizer.isRecording ? .red : .secondary)
+                        .frame(width: 30, height: 30)
                 }
+                .buttonStyle(.plain)
+                .padding(.trailing, 4)
+            }
+            .frame(width: 340, height: 32)
+            .background(
+                Capsule()
+                    .fill(Color(NSColor.controlBackgroundColor))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+            )
             
             HStack(spacing: 8) {
                 Button("取消") {
+                    if speechRecognizer.isRecording {
+                        speechRecognizer.toggleRecording()
+                    }
                     isPresented = false
                     inputText = ""
                 }
@@ -177,9 +304,17 @@ struct ChatInputView: View {
                 .fill(Color(NSColor.windowBackgroundColor))
                 .shadow(radius: 8)
         )
+        .onDisappear {
+            if speechRecognizer.isRecording {
+                speechRecognizer.toggleRecording()
+            }
+        }
     }
     
     private func submitIfNotEmpty() {
+        if speechRecognizer.isRecording {
+            speechRecognizer.toggleRecording()
+        }
         let trimmed = inputText.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         onSubmit(trimmed)

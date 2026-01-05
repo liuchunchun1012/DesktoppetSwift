@@ -107,6 +107,12 @@ class StatusBarController {
         animMenuItem.submenu = animMenu
         menu.addItem(animMenuItem)
         
+        // Focus Mode
+        let focusItem = NSMenuItem(title: "专注模式", action: #selector(toggleFocusMode), keyEquivalent: "")
+        focusItem.image = NSImage(systemSymbolName: "moon.fill", accessibilityDescription: nil)
+        focusItem.target = self
+        menu.addItem(focusItem)
+        
         menu.addItem(NSMenuItem.separator())
         
         // Settings
@@ -226,6 +232,10 @@ class StatusBarController {
             }
         }
     }
+    
+    @objc private func toggleFocusMode() {
+        NotificationCenter.default.post(name: .toggleFocusMode, object: nil)
+    }
 }
 
 // Notification names
@@ -233,6 +243,7 @@ extension Notification.Name {
     static let setAnimation = Notification.Name("setAnimation")
     static let openChatInput = Notification.Name("openChatInput")
     static let dailySummaryResult = Notification.Name("dailySummaryResult")
+    static let toggleFocusMode = Notification.Name("toggleFocusMode")
 }
 
 // Input mode enum (shared)

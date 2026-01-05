@@ -41,7 +41,8 @@ chmod +x "$APP_NAME/Contents/MacOS/DesktoppetSwift"
 # 复制精灵图
 echo "Copying sprites..."
 if [ -d "Sources/DesktoppetSwift/Resources" ]; then
-    cp -r Sources/DesktoppetSwift/Resources "$APP_NAME/Contents/Resources/sprites_aligned"
+    mkdir -p "$APP_NAME/Contents/Resources/sprites_aligned"
+    cp -r Sources/DesktoppetSwift/Resources/* "$APP_NAME/Contents/Resources/sprites_aligned/"
     echo "✅ Sprites copied successfully"
 else
     echo "⚠️  Warning: Sprites directory not found at Sources/DesktoppetSwift/Resources"
@@ -51,6 +52,13 @@ fi
 if [ -f "AppIcon.icns" ]; then
     cp AppIcon.icns "$APP_NAME/Contents/Resources/"
     echo "✅ App icon copied"
+fi
+
+# 复制菜单栏模板图标
+if [ -f "menubar_iconTemplate.png" ]; then
+    cp menubar_iconTemplate.png "$APP_NAME/Contents/Resources/"
+    cp menubar_iconTemplate@2x.png "$APP_NAME/Contents/Resources/"
+    echo "✅ Menu bar icons copied"
 fi
 
 # 创建 Info.plist
@@ -80,6 +88,10 @@ cat > "$APP_NAME/Contents/Info.plist" << 'EOF'
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>我们需要麦克风权限来进行语音转文字输入。</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>我们需要语音识别权限来将您的语音转换为文字。</string>
 </dict>
 </plist>
 EOF

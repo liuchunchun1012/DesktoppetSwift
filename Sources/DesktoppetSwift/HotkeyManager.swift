@@ -15,6 +15,7 @@ class HotkeyManager {
         case openChat = 1
         case translate = 2
         case analyzeImage = 3
+        case selectionToolbar = 4
     }
     
     init() {
@@ -24,35 +25,55 @@ class HotkeyManager {
     private func setupCarbonHotkeys() {
         print("[HotkeyManager] Setting up Carbon hotkeys...")
         
-        // 1. Register Hotkeys
-        registerHotkey(keyCode: kVK_ANSI_J, id: .openChat)
-        registerHotkey(keyCode: kVK_ANSI_T, id: .translate)
-        registerHotkey(keyCode: kVK_ANSI_L, id: .analyzeImage)
+        // 从 UserSettings 读取配置
+        let settings = UserSettings.shared
         
-        // 2. Install Event Handler
-        let eventSpec = [
-            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        ]
+        registerHotkey(config: settings.hotkeyChat, id: .openChat)
+        registerHotkey(config: settings.hotkeyTranslate, id: .translate)
+        registerHotkey(config: settings.hotkeyImage, id: .analyzeImage)
+        registerHotkey(config: settings.hotkeySelection, id: .selectionToolbar)
         
-        InstallEventHandler(GetApplicationEventTarget(), { (handler, event, userData) -> OSStatus in
-            return HotkeyManager.shared.handleCarbonEvent(event)
-        }, 1, eventSpec, nil, &eventHandler)
-        
-        print("[HotkeyManager] Carbon event handler installed")
+        // Install Event Handler (only once)
+        if eventHandler == nil {
+            let eventSpec = [
+                EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+            ]
+            
+            InstallEventHandler(GetApplicationEventTarget(), { (handler, event, userData) -> OSStatus in
+                return HotkeyManager.shared.handleCarbonEvent(event)
+            }, 1, eventSpec, nil, &eventHandler)
+            
+            print("[HotkeyManager] Carbon event handler installed")
+        }
     }
     
-    private func registerHotkey(keyCode: Int, id: HotkeyID) {
+    /// 重新注册所有快捷键（配置更改后调用）
+    func reregisterHotkeys() {
+        // 先注销所有现有快捷键
+        for (_, ref) in hotkeyRefs {
+            UnregisterEventHotKey(ref)
+        }
+        hotkeyRefs.removeAll()
+        
+        // 重新注册
+        let settings = UserSettings.shared
+        registerHotkey(config: settings.hotkeyChat, id: .openChat)
+        registerHotkey(config: settings.hotkeyTranslate, id: .translate)
+        registerHotkey(config: settings.hotkeyImage, id: .analyzeImage)
+        registerHotkey(config: settings.hotkeySelection, id: .selectionToolbar)
+        
+        print("[HotkeyManager] Hotkeys re-registered")
+    }
+    
+    private func registerHotkey(config: HotkeyConfig, id: HotkeyID) {
         var hotKeyRef: EventHotKeyRef?
         let hotKeyID = EventHotKeyID(signature: OSType(0x4445534B), id: id.rawValue) // Sig: 'DESK'
         
-        // Cmd + Shift + Key
-        let modifiers = cmdKey | shiftKey
-        
-        let status = RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        let status = RegisterEventHotKey(UInt32(config.keyCode), UInt32(config.modifiers), hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
         
         if status == noErr, let ref = hotKeyRef {
             hotkeyRefs[id.rawValue] = ref
-            print("[HotkeyManager] Registered hotkey ID \(id.rawValue) for key \(keyCode)")
+            print("[HotkeyManager] Registered hotkey ID \(id.rawValue): \(config.displayString)")
         } else {
             print("[HotkeyManager] Failed to register hotkey ID \(id.rawValue), error: \(status)")
         }
@@ -91,6 +112,12 @@ class HotkeyManager {
                 print("[HotkeyManager] 🔥 Carbon Hotkey: Analyze")
                 DispatchQueue.main.async {
                     self.analyzeClipboardImage()
+                }
+                
+            case .selectionToolbar:
+                print("[HotkeyManager] 🔥 Carbon Hotkey: Selection Toolbar")
+                DispatchQueue.main.async {
+                    TextSelectionAssistant.shared.triggerFromClipboard()
                 }
             }
         }

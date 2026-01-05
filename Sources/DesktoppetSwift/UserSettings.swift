@@ -1,5 +1,72 @@
 import Foundation
 import Combine
+import Carbon
+
+/// 快捷键配置结构
+struct HotkeyConfig: Codable, Equatable {
+    let keyCode: Int
+    let modifiers: Int  // Carbon modifiers: cmdKey=256, shiftKey=512, etc.
+    
+    /// 默认快捷键配置
+    static let defaultChat = HotkeyConfig(keyCode: kVK_ANSI_J, modifiers: cmdKey | shiftKey)
+    static let defaultTranslate = HotkeyConfig(keyCode: kVK_ANSI_T, modifiers: cmdKey | shiftKey)
+    static let defaultImage = HotkeyConfig(keyCode: kVK_ANSI_L, modifiers: cmdKey | shiftKey)
+    static let defaultSelection = HotkeyConfig(keyCode: kVK_ANSI_S, modifiers: cmdKey | shiftKey)
+    
+    /// 显示用的快捷键字符串
+    var displayString: String {
+        var parts: [String] = []
+        if modifiers & cmdKey != 0 { parts.append("⌘") }
+        if modifiers & shiftKey != 0 { parts.append("⇧") }
+        if modifiers & optionKey != 0 { parts.append("⌥") }
+        if modifiers & controlKey != 0 { parts.append("⌃") }
+        parts.append(keyCodeToString(keyCode))
+        return parts.joined()
+    }
+    
+    /// keyCode 转换为可显示字符
+    private func keyCodeToString(_ code: Int) -> String {
+        switch code {
+        case kVK_ANSI_A: return "A"
+        case kVK_ANSI_B: return "B"
+        case kVK_ANSI_C: return "C"
+        case kVK_ANSI_D: return "D"
+        case kVK_ANSI_E: return "E"
+        case kVK_ANSI_F: return "F"
+        case kVK_ANSI_G: return "G"
+        case kVK_ANSI_H: return "H"
+        case kVK_ANSI_I: return "I"
+        case kVK_ANSI_J: return "J"
+        case kVK_ANSI_K: return "K"
+        case kVK_ANSI_L: return "L"
+        case kVK_ANSI_M: return "M"
+        case kVK_ANSI_N: return "N"
+        case kVK_ANSI_O: return "O"
+        case kVK_ANSI_P: return "P"
+        case kVK_ANSI_Q: return "Q"
+        case kVK_ANSI_R: return "R"
+        case kVK_ANSI_S: return "S"
+        case kVK_ANSI_T: return "T"
+        case kVK_ANSI_U: return "U"
+        case kVK_ANSI_V: return "V"
+        case kVK_ANSI_W: return "W"
+        case kVK_ANSI_X: return "X"
+        case kVK_ANSI_Y: return "Y"
+        case kVK_ANSI_Z: return "Z"
+        case kVK_ANSI_0: return "0"
+        case kVK_ANSI_1: return "1"
+        case kVK_ANSI_2: return "2"
+        case kVK_ANSI_3: return "3"
+        case kVK_ANSI_4: return "4"
+        case kVK_ANSI_5: return "5"
+        case kVK_ANSI_6: return "6"
+        case kVK_ANSI_7: return "7"
+        case kVK_ANSI_8: return "8"
+        case kVK_ANSI_9: return "9"
+        default: return "?"
+        }
+    }
+}
 
 /// 用户设置管理器
 /// 使用 UserDefaults 持久化非敏感配置
@@ -26,6 +93,13 @@ class UserSettings: ObservableObject {
         static let obsidianEnabled = "obsidianEnabled"
         static let obsidianVaultPath = "obsidianVaultPath"
         static let obsidianChatLogFolder = "obsidianChatLogFolder"
+        static let obsidianQuickSaveFolder = "obsidianQuickSaveFolder"
+        static let selectionAssistantEnabled = "selectionAssistantEnabled"
+        // 快捷键配置
+        static let hotkeyChat = "hotkeyChat"
+        static let hotkeyTranslate = "hotkeyTranslate"
+        static let hotkeyImage = "hotkeyImage"
+        static let hotkeySelection = "hotkeySelection"
     }
     
     // MARK: - Published Properties
@@ -142,6 +216,64 @@ class UserSettings: ObservableObject {
         }
     }
     
+    /// Obsidian 快速保存文件夹
+    @Published var obsidianQuickSaveFolder: String {
+        didSet {
+            defaults.set(obsidianQuickSaveFolder, forKey: Keys.obsidianQuickSaveFolder)
+        }
+    }
+    
+    /// 是否启用划词助手
+    @Published var selectionAssistantEnabled: Bool {
+        didSet {
+            defaults.set(selectionAssistantEnabled, forKey: Keys.selectionAssistantEnabled)
+            // 根据设置开启或关闭
+            if selectionAssistantEnabled {
+                TextSelectionAssistant.shared.enable()
+            } else {
+                TextSelectionAssistant.shared.disable()
+            }
+        }
+    }
+    
+    // MARK: - 快捷键配置
+    
+    /// 对话快捷键 (默认: J)
+    @Published var hotkeyChat: HotkeyConfig {
+        didSet {
+            if let data = try? JSONEncoder().encode(hotkeyChat) {
+                defaults.set(data, forKey: Keys.hotkeyChat)
+            }
+        }
+    }
+    
+    /// 翻译快捷键 (默认: T)
+    @Published var hotkeyTranslate: HotkeyConfig {
+        didSet {
+            if let data = try? JSONEncoder().encode(hotkeyTranslate) {
+                defaults.set(data, forKey: Keys.hotkeyTranslate)
+            }
+        }
+    }
+    
+    /// 图像分析快捷键 (默认: L)
+    @Published var hotkeyImage: HotkeyConfig {
+        didSet {
+            if let data = try? JSONEncoder().encode(hotkeyImage) {
+                defaults.set(data, forKey: Keys.hotkeyImage)
+            }
+        }
+    }
+    
+    /// 划词工具栏快捷键 (默认: S)
+    @Published var hotkeySelection: HotkeyConfig {
+        didSet {
+            if let data = try? JSONEncoder().encode(hotkeySelection) {
+                defaults.set(data, forKey: Keys.hotkeySelection)
+            }
+        }
+    }
+    
     // MARK: - Initialization
     
     private init() {
@@ -199,8 +331,27 @@ class UserSettings: ObservableObject {
         self.obsidianEnabled = defaults.bool(forKey: Keys.obsidianEnabled)
         self.obsidianVaultPath = defaults.string(forKey: Keys.obsidianVaultPath) ?? ""
         self.obsidianChatLogFolder = defaults.string(forKey: Keys.obsidianChatLogFolder) ?? "ChatLogs"
+        self.obsidianQuickSaveFolder = defaults.string(forKey: Keys.obsidianQuickSaveFolder) ?? "QuickNotes"
+        
+        // 加载划词助手配置（默认关闭）
+        self.selectionAssistantEnabled = defaults.bool(forKey: Keys.selectionAssistantEnabled)
+        
+        // 加载快捷键配置
+        self.hotkeyChat = Self.loadHotkeyConfig(from: defaults, key: Keys.hotkeyChat, default: .defaultChat)
+        self.hotkeyTranslate = Self.loadHotkeyConfig(from: defaults, key: Keys.hotkeyTranslate, default: .defaultTranslate)
+        self.hotkeyImage = Self.loadHotkeyConfig(from: defaults, key: Keys.hotkeyImage, default: .defaultImage)
+        self.hotkeySelection = Self.loadHotkeyConfig(from: defaults, key: Keys.hotkeySelection, default: .defaultSelection)
         
         loadProviderConfigs()
+    }
+    
+    /// 加载单个快捷键配置
+    private static func loadHotkeyConfig(from defaults: UserDefaults, key: String, default defaultValue: HotkeyConfig) -> HotkeyConfig {
+        if let data = defaults.data(forKey: key),
+           let config = try? JSONDecoder().decode(HotkeyConfig.self, from: data) {
+            return config
+        }
+        return defaultValue
     }
     
     // MARK: - Provider Configuration

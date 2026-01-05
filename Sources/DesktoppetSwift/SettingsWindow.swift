@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Carbon
 
 /// 设置窗口控制器
 class SettingsWindowController {
@@ -88,8 +89,10 @@ struct SettingsView: View {
             SystemPromptsTab()
         case .appearance:
             AppearanceSettingsTab()
-        case .language:
-            LanguageSettingsTab()
+        case .tools:
+            ToolsSettingsTab()
+        case .hotkeys:
+            HotkeysSettingsTab()
         case .notion:
             NotionSettingsTab()
         case .obsidian:
@@ -139,7 +142,8 @@ enum SettingsSection: String, CaseIterable {
     case ai
     case prompts
     case appearance
-    case language
+    case tools
+    case hotkeys
     case notion
     case obsidian
     case about
@@ -149,7 +153,8 @@ enum SettingsSection: String, CaseIterable {
         case .ai: return "AI 设置"
         case .prompts: return "系统提示词"
         case .appearance: return "外观"
-        case .language: return "语言"
+        case .tools: return "工具"
+        case .hotkeys: return "快捷键"
         case .notion: return "Notion 同步"
         case .obsidian: return "Obsidian 同步"
         case .about: return "关于"
@@ -161,7 +166,8 @@ enum SettingsSection: String, CaseIterable {
         case .ai: return "brain"
         case .prompts: return "text.bubble"
         case .appearance: return "paintbrush"
-        case .language: return "globe"
+        case .tools: return "hammer"
+        case .hotkeys: return "keyboard"
         case .notion: return "doc.text"
         case .obsidian: return "note.text"
         case .about: return "info.circle"
@@ -630,42 +636,438 @@ struct SystemPromptsTab: View {
     }
 }
 
-// MARK: - Language Settings Tab
+// MARK: - Tools Settings Tab
 
-struct LanguageSettingsTab: View {
+struct ToolsSettingsTab: View {
     @StateObject private var settings = UserSettings.shared
 
     var body: some View {
         Form {
+            // MARK: - 翻译设置
             Section {
-                Text("翻译目标语言")
+                Text("翻译设置")
                     .font(.headline)
 
-                Picker("翻译到", selection: $settings.translationLanguage) {
-                    ForEach(TranslationLanguage.allCases) { lang in
-                        Text(lang.displayName).tag(lang)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("翻译目标语言")
+                        .font(.subheadline)
+                    
+                    Picker("", selection: $settings.translationLanguage) {
+                        ForEach(TranslationLanguage.allCases) { lang in
+                            Text(lang.displayName).tag(lang)
+                        }
                     }
+                    .pickerStyle(.radioGroup)
+                    .labelsHidden()
                 }
-                .pickerStyle(.radioGroup)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("使用方法：")
+                        .font(.subheadline)
+                        .bold()
+                    Text("1. 复制要翻译的文字")
+                        .foregroundColor(.secondary)
+                    Text("2. 使用翻译快捷键触发")
+                        .foregroundColor(.secondary)
+                    Text("3. 翻译结果显示在气泡中")
+                        .foregroundColor(.secondary)
+                }
             }
 
             Divider()
-
+            
+            // MARK: - 划词助手设置
             Section {
-                Text("使用方法")
+                Text("划词助手")
                     .font(.headline)
+                
+                Toggle("启用划词助手", isOn: $settings.selectionAssistantEnabled)
+                    .help("使用快捷键触发划词工具栏")
+                
+                if settings.selectionAssistantEnabled {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("已启用")
+                                .foregroundColor(.green)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("使用方法：")
+                                .font(.subheadline)
+                                .bold()
+                            Text("1. 选中任意文字并复制")
+                                .foregroundColor(.secondary)
+                            Text("2. 使用划词快捷键触发工具栏")
+                                .foregroundColor(.secondary)
+                            Text("3. 选择操作：翻译、解释、总结、搜索")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            // MARK: - 图像分析说明
+            Section {
+                Text("图像分析")
+                    .font(.headline)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("使用方法：")
+                        .font(.subheadline)
+                        .bold()
+                    Text("1. 使用截图工具截图到剪贴板")
+                        .foregroundColor(.secondary)
+                    Text("2. 使用图像分析快捷键触发")
+                        .foregroundColor(.secondary)
+                    Text("3. 在输入框中输入问题")
+                        .foregroundColor(.secondary)
+                    Text("4. 小猫会分析图片并回答")
+                        .foregroundColor(.secondary)
+                }
+            }
 
-                Text("1. 复制要翻译的文字")
+            Spacer()
+        }
+        .padding()
+    }
+}
+
+// MARK: - Hotkeys Settings Tab
+
+struct HotkeysSettingsTab: View {
+    @StateObject private var settings = UserSettings.shared
+    @State private var editingHotkey: HotkeyType?
+    @State private var showingRecorder = false
+    
+    enum HotkeyType: String, CaseIterable {
+        case chat, translate, image, selection
+        
+        var name: String {
+            switch self {
+            case .chat: return "打开对话"
+            case .translate: return "翻译"
+            case .image: return "图像分析"
+            case .selection: return "划词工具栏"
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .chat: return "与小猫聊天"
+            case .translate: return "翻译剪贴板中的文字"
+            case .image: return "分析剪贴板中的图片"
+            case .selection: return "显示翻译/解释/总结工具栏"
+            }
+        }
+    }
+    
+    var body: some View {
+        Form {
+            Section {
+                Text("全局快捷键")
+                    .font(.headline)
+                
+                Text("点击快捷键可以修改")
+                    .font(.caption)
                     .foregroundColor(.secondary)
-                Text("2. 按 Cmd+Shift+T 进行翻译")
+            }
+            
+            Divider()
+            
+            // 快捷键列表
+            VStack(alignment: .leading, spacing: 16) {
+                EditableHotkeyRow(
+                    name: "打开对话",
+                    description: "与小猫聊天",
+                    config: settings.hotkeyChat,
+                    onEdit: { editingHotkey = .chat; showingRecorder = true }
+                )
+                
+                Divider()
+                
+                EditableHotkeyRow(
+                    name: "翻译",
+                    description: "翻译剪贴板中的文字",
+                    config: settings.hotkeyTranslate,
+                    onEdit: { editingHotkey = .translate; showingRecorder = true }
+                )
+                
+                Divider()
+                
+                EditableHotkeyRow(
+                    name: "图像分析",
+                    description: "分析剪贴板中的图片",
+                    config: settings.hotkeyImage,
+                    onEdit: { editingHotkey = .image; showingRecorder = true }
+                )
+                
+                Divider()
+                
+                EditableHotkeyRow(
+                    name: "划词工具栏",
+                    description: "显示翻译/解释/总结工具栏",
+                    config: settings.hotkeySelection,
+                    onEdit: { editingHotkey = .selection; showingRecorder = true }
+                )
+            }
+            
+            Divider()
+            
+            // 恢复默认按钮
+            HStack {
+                Button("恢复默认") {
+                    resetToDefaults()
+                }
+                .buttonStyle(.bordered)
+                
+                Spacer()
+            }
+            
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("提示")
+                    .font(.headline)
+                
+                Text("• 快捷键在所有应用中全局生效")
                     .foregroundColor(.secondary)
-                Text("3. 翻译结果将显示在宠物气泡中")
+                Text("• 先用 Cmd+C 复制内容，再使用快捷键")
+                    .foregroundColor(.secondary)
+                Text("• 修改后即时生效")
                     .foregroundColor(.secondary)
             }
 
             Spacer()
         }
         .padding()
+        .sheet(isPresented: $showingRecorder) {
+            HotkeyRecorderSheet(
+                hotkeyType: editingHotkey ?? .chat,
+                isPresented: $showingRecorder
+            )
+        }
+    }
+    
+    private func resetToDefaults() {
+        settings.hotkeyChat = .defaultChat
+        settings.hotkeyTranslate = .defaultTranslate
+        settings.hotkeyImage = .defaultImage
+        settings.hotkeySelection = .defaultSelection
+        HotkeyManager.shared.reregisterHotkeys()
+    }
+}
+
+/// 可编辑的快捷键行
+struct EditableHotkeyRow: View {
+    let name: String
+    let description: String
+    let config: HotkeyConfig
+    let onEdit: () -> Void
+    
+    @State private var isHovered = false
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name)
+                    .font(.system(size: 14, weight: .medium))
+                Text(description)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            // 快捷键按钮（可点击编辑）
+            Button(action: onEdit) {
+                Text(config.displayString)
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(isHovered ? Color.accentColor.opacity(0.3) : Color.gray.opacity(0.2))
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                isHovered = hovering
+            }
+        }
+    }
+}
+
+/// 快捷键录制弹窗
+struct HotkeyRecorderSheet: View {
+    let hotkeyType: HotkeysSettingsTab.HotkeyType
+    @Binding var isPresented: Bool
+    @StateObject private var settings = UserSettings.shared
+    @State private var recordedKey: HotkeyConfig?
+    @State private var isRecording = false
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("设置「\(hotkeyType.name)」快捷键")
+                .font(.headline)
+            
+            Text("请按下新的快捷键组合")
+                .foregroundColor(.secondary)
+            
+            // 当前/录制中的快捷键显示
+            HotkeyRecorderView(
+                currentConfig: getCurrentConfig(),
+                recordedKey: $recordedKey,
+                isRecording: $isRecording
+            )
+            .frame(width: 150, height: 50)
+            
+            if isRecording {
+                Text("正在录制... 按 ESC 取消")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
+            
+            HStack(spacing: 16) {
+                Button("取消") {
+                    isPresented = false
+                }
+                .keyboardShortcut(.cancelAction)
+                
+                Button("保存") {
+                    if let key = recordedKey {
+                        saveHotkey(key)
+                    }
+                    isPresented = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(recordedKey == nil)
+            }
+        }
+        .padding(30)
+        .frame(width: 300)
+    }
+    
+    private func getCurrentConfig() -> HotkeyConfig {
+        switch hotkeyType {
+        case .chat: return settings.hotkeyChat
+        case .translate: return settings.hotkeyTranslate
+        case .image: return settings.hotkeyImage
+        case .selection: return settings.hotkeySelection
+        }
+    }
+    
+    private func saveHotkey(_ config: HotkeyConfig) {
+        switch hotkeyType {
+        case .chat: settings.hotkeyChat = config
+        case .translate: settings.hotkeyTranslate = config
+        case .image: settings.hotkeyImage = config
+        case .selection: settings.hotkeySelection = config
+        }
+        HotkeyManager.shared.reregisterHotkeys()
+    }
+}
+
+/// 快捷键录制视图（使用 NSViewRepresentable）
+struct HotkeyRecorderView: NSViewRepresentable {
+    let currentConfig: HotkeyConfig
+    @Binding var recordedKey: HotkeyConfig?
+    @Binding var isRecording: Bool
+    
+    func makeNSView(context: Context) -> HotkeyRecorderNSView {
+        let view = HotkeyRecorderNSView()
+        view.currentConfig = currentConfig
+        view.onKeyRecorded = { config in
+            recordedKey = config
+            isRecording = false
+        }
+        view.onRecordingStateChanged = { recording in
+            isRecording = recording
+        }
+        return view
+    }
+    
+    func updateNSView(_ nsView: HotkeyRecorderNSView, context: Context) {
+        nsView.currentConfig = currentConfig
+    }
+}
+
+/// NSView 用于捕获键盘事件
+class HotkeyRecorderNSView: NSView {
+    var currentConfig: HotkeyConfig?
+    var onKeyRecorded: ((HotkeyConfig) -> Void)?
+    var onRecordingStateChanged: ((Bool) -> Void)?
+    
+    private var isRecording = false
+    private var displayString: String {
+        currentConfig?.displayString ?? "???"
+    }
+    
+    override var acceptsFirstResponder: Bool { true }
+    
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        
+        let bgColor = isRecording ? NSColor.systemBlue.withAlphaComponent(0.2) : NSColor.gray.withAlphaComponent(0.2)
+        bgColor.setFill()
+        let path = NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8)
+        path.fill()
+        
+        // Draw border
+        if isRecording {
+            NSColor.systemBlue.setStroke()
+            path.lineWidth = 2
+            path.stroke()
+        }
+        
+        // Draw text
+        let text = isRecording ? "按下快捷键..." : displayString
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 16, weight: .medium),
+            .foregroundColor: NSColor.labelColor
+        ]
+        let size = text.size(withAttributes: attributes)
+        let point = NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2)
+        text.draw(at: point, withAttributes: attributes)
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        isRecording = true
+        onRecordingStateChanged?(true)
+        window?.makeFirstResponder(self)
+        needsDisplay = true
+    }
+    
+    override func keyDown(with event: NSEvent) {
+        guard isRecording else { return }
+        
+        // ESC 取消
+        if event.keyCode == 53 {
+            isRecording = false
+            onRecordingStateChanged?(false)
+            needsDisplay = true
+            return
+        }
+        
+        // 需要修饰键
+        let flags = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        guard flags.contains(.command) || flags.contains(.control) else {
+            return // 必须包含 Cmd 或 Control
+        }
+        
+        var modifiers = 0
+        if flags.contains(.command) { modifiers |= cmdKey }
+        if flags.contains(.shift) { modifiers |= shiftKey }
+        if flags.contains(.option) { modifiers |= optionKey }
+        if flags.contains(.control) { modifiers |= controlKey }
+        
+        let config = HotkeyConfig(keyCode: Int(event.keyCode), modifiers: modifiers)
+        currentConfig = config
+        onKeyRecorded?(config)
+        
+        isRecording = false
+        needsDisplay = true
     }
 }
 
@@ -893,6 +1295,17 @@ struct ObsidianSettingsTab: View {
                         TextField("ChatLogs", text: $settings.obsidianChatLogFolder)
                             .textFieldStyle(.roundedBorder)
                         Text("聊天记录将保存在 Vault 的这个文件夹下")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // 快速保存文件夹
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("快速保存文件夹")
+                            .font(.subheadline)
+                        TextField("QuickNotes", text: $settings.obsidianQuickSaveFolder)
+                            .textFieldStyle(.roundedBorder)
+                        Text("气泡保存按钮将保存到这个文件夹")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

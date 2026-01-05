@@ -15,6 +15,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup global hotkeys
         hotkeyManager = HotkeyManager.shared
         
+        // Initialize Selection Toolbar Window Controller (for text selection assistant)
+        _ = SelectionToolbarWindowController.shared
+        
+        // Enable text selection assistant if setting is on
+        if UserSettings.shared.selectionAssistantEnabled {
+            TextSelectionAssistant.shared.enable()
+        }
+        
+        // Start HTTP server for external messages (port 1012)
+        MeowHTTPServer.shared.start()
+        
         let windowRect = NSRect(x: 100, y: 100, width: 300, height: 220)
         
         // Create the window

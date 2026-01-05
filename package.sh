@@ -81,6 +81,10 @@ cat > "$APP_DIR/Contents/Info.plist" <<EOF
     <true/>
     <key>LSUIElement</key>
     <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>我们需要麦克风权限来进行语音转文字输入。</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>我们需要语音识别权限来将您的语音转换为文字。</string>
 </dict>
 </plist>
 EOF

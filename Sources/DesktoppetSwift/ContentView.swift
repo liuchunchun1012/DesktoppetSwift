@@ -49,6 +49,12 @@ class SpriteAnimator: ObservableObject {
     private var hasTriggeredHoverInteraction = false
     private var currentLoopCount = 0
     
+    /// 用户手动选择动作时为 true，暂停自动循环
+    private var isManualAction = false
+    
+    /// 专注模式 - 小猫持续睡觉
+    @Published var isFocusMode = false
+    
     // Actions for random cycling
     private let walkActions = ["walk_left", "walk_right", "walk_up", "walk_down"]
     
@@ -124,11 +130,16 @@ class SpriteAnimator: ObservableObject {
     }
     
     func startBehaviorCycle() {
-        if isInRestSequence { return }
+        // 专注模式或手动动作时不启动自动循环
+        if isInRestSequence || isFocusMode || isManualAction { return }
         
         behaviorTimer?.invalidate()
         behaviorTimer = Timer.scheduledTimer(withTimeInterval: Double.random(in: 5...12), repeats: false) { [weak self] _ in
-            guard let self = self, !self.isHovering, !self.isInRestSequence else {
+            guard let self = self,
+                  !self.isHovering,
+                  !self.isInRestSequence,
+                  !self.isFocusMode,
+                  !self.isManualAction else {
                 self?.startBehaviorCycle()
                 return
             }
@@ -254,6 +265,51 @@ class SpriteAnimator: ObservableObject {
         }
     }
     
+    /// 用户手动选择动作（暂停自动循环直到动作完成）
+    func setManualAction(_ action: String) {
+        isManualAction = true
+        behaviorTimer?.invalidate()
+        
+        setAction(action, onComplete: { [weak self] in
+            self?.isManualAction = false
+            self?.setAction("idle")
+            self?.startBehaviorCycle()
+        })
+    }
+    
+    /// 进入专注模式（小猫持续睡觉）
+    func enterFocusMode() {
+        isFocusMode = true
+        isManualAction = false
+        isInRestSequence = false
+        behaviorTimer?.invalidate()
+        
+        // 播放入睡动画后进入睡眠循环
+        setAction("rest_prepare", onComplete: { [weak self] in
+            self?.loopFocusSleep()
+        })
+    }
+    
+    /// 专注模式下持续循环睡眠动画
+    private func loopFocusSleep() {
+        guard isFocusMode else { return }
+        
+        setAction("rest_sleeping", onComplete: { [weak self] in
+            self?.loopFocusSleep()  // 无限循环
+        })
+    }
+    
+    /// 退出专注模式
+    func exitFocusMode() {
+        isFocusMode = false
+        
+        // 播放起床动画后恢复正常
+        setAction("rest_wakeup", onComplete: { [weak self] in
+            self?.setAction("idle")
+            self?.startBehaviorCycle()
+        })
+    }
+    
     func stopAnimation() {
         animationTimer?.invalidate()
         animationTimer = nil
@@ -274,6 +330,12 @@ class ChatState: ObservableObject {
     @Published var chatMessage = ""
     @Published var isLoading = false
     @Published var isBubbleHovered = false
+    
+    /// 最近一次用户输入（用于保存完整对话到 Obsidian）
+    var lastUserMessage = ""
+    
+    /// 最近一次图片的 Base64（用于保存含图片的对话）
+    var lastImageBase64: String?
     
     private init() {}
 }
@@ -363,18 +425,18 @@ struct ContentView: View {
                 
                 // Animation controls - all in submenu
                 Menu("切换动作") {
-                    Button("待机舔毛") { animator.setAction("idle") }
-                    Button("开心跳跃") { animator.setAction("happy_jump") }
-                    Button("吃猫粮") { animator.setAction("eating") }
+                    Button("待机舔毛") { animator.setManualAction("idle") }
+                    Button("开心跳跃") { animator.setManualAction("happy_jump") }
+                    Button("吃猫粮") { animator.setManualAction("eating") }
                     Divider()
-                    Button("准备睡觉") { animator.setAction("rest_prepare") }
-                    Button("睡觉中") { animator.setAction("rest_sleeping") }
-                    Button("起床") { animator.setAction("rest_wakeup") }
+                    Button("准备睡觉") { animator.setManualAction("rest_prepare") }
+                    Button("睡觉中") { animator.setManualAction("rest_sleeping") }
+                    Button("起床") { animator.setManualAction("rest_wakeup") }
                     Divider()
-                    Button("向左走") { animator.setAction("walk_left") }
-                    Button("向右走") { animator.setAction("walk_right") }
-                    Button("向上走") { animator.setAction("walk_up") }
-                    Button("向下走") { animator.setAction("walk_down") }
+                    Button("向左走") { animator.setManualAction("walk_left") }
+                    Button("向右走") { animator.setManualAction("walk_right") }
+                    Button("向上走") { animator.setManualAction("walk_up") }
+                    Button("向下走") { animator.setManualAction("walk_down") }
                 }
                 
                 Divider()
@@ -472,6 +534,22 @@ struct ContentView: View {
                 }
             }
         }
+        // MARK: - Selection Toolbar Actions
+        .onReceive(NotificationCenter.default.publisher(for: .selectionAction)) { notification in
+            if let userInfo = notification.userInfo,
+               let actionStr = userInfo["action"] as? String,
+               let text = userInfo["text"] as? String {
+                handleSelectionAction(actionStr, text: text)
+            }
+        }
+        // Focus Mode Toggle Notification
+        .onReceive(NotificationCenter.default.publisher(for: .toggleFocusMode)) { _ in
+            if animator.isFocusMode {
+                animator.exitFocusMode()
+            } else {
+                animator.enterFocusMode()
+            }
+        }
     }
     
     private func handleInput(_ text: String) {
@@ -479,6 +557,8 @@ struct ContentView: View {
         chatState.showChatBubble = true
         chatState.isLoading = true
         chatState.chatMessage = ""
+        chatState.lastUserMessage = text  // 记录用户输入用于保存完整对话
+        chatState.lastImageBase64 = nil   // 清除之前的图片缓存
         
         // Cancel any existing hide timer
         hideTimer?.cancel()
@@ -590,6 +670,8 @@ struct ContentView: View {
         chatState.showChatBubble = true
         chatState.isLoading = true
         chatState.chatMessage = ""
+        chatState.lastUserMessage = question ?? "请分析这张图片"  // 记录用户问题
+        chatState.lastImageBase64 = imageBase64  // 记录图片用于保存
         hideTimer?.cancel()
         animator.setAction("idle")
         
@@ -609,6 +691,64 @@ struct ContentView: View {
                     self.chatState.chatMessage = "分析失败喵: \(error.localizedDescription)"
                 }
                 self.scheduleHideBubble(afterSeconds: 20) // Longer for image analysis
+            }
+        )
+    }
+    
+    /// Handle selection toolbar actions (explain, summarize, translate)
+    private func handleSelectionAction(_ actionStr: String, text: String) {
+        guard let action = SelectionActionType(rawValue: actionStr) else { return }
+        
+        chatState.showChatBubble = true
+        chatState.isLoading = true
+        chatState.chatMessage = ""
+        hideTimer?.cancel()
+        animator.setAction("idle")
+        
+        let prompt: String
+        switch action {
+        case .translate:
+            // Reuse existing translate logic
+            handleTranslate(text: text)
+            return
+            
+        case .explain:
+            prompt = """
+            请用简单易懂的语言解释以下内容，如果是专业术语请给出定义和例子：
+            
+            \(text)
+            
+            用中文回答，保持简洁（不超过100字）。
+            """
+            
+        case .summarize:
+            prompt = """
+            请总结以下内容的核心要点：
+            
+            \(text)
+            
+            用中文回答，用要点列表形式，保持简洁（不超过100字）。
+            """
+            
+        case .search:
+            // Search is handled directly in SelectionToolbarWindowController
+            return
+        }
+        
+        AIProviderManager.shared.chatStream(
+            message: prompt,
+            onUpdate: { partialResponse in
+                self.chatState.chatMessage = partialResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+                self.chatState.isLoading = false
+            },
+            onComplete: { result in
+                switch result {
+                case .success(let response):
+                    self.chatState.chatMessage = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                case .failure(let error):
+                    self.chatState.chatMessage = "处理失败喵: \(error.localizedDescription)"
+                }
+                self.scheduleHideBubble(afterSeconds: 15)
             }
         )
     }
