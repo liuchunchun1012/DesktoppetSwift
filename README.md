@@ -260,6 +260,8 @@ If this project helps you:
 
 If you'd like to buy me a coffee:
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/liuchun)
+
 <table>
   <tr>
     <td align="center">
