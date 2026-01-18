@@ -2,20 +2,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "DesktoppetSwift",
+    name: "Meowpal",
     platforms: [
         .macOS(.v12) // ScreenCaptureKit and other modern APIs require a recent macOS version.
     ],
     products: [
-        .executable(name: "DesktoppetSwift", targets: ["DesktoppetSwift"])
+        .executable(name: "Meowpal", targets: ["Meowpal"])
     ],
     dependencies: [
         // No external dependencies for this phase.
     ],
     targets: [
         .executableTarget(
-            name: "DesktoppetSwift",
-            path: "Sources/DesktoppetSwift"
+            name: "Meowpal",
+            path: "Sources/Meowpal"
         )
     ]
 )

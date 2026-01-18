@@ -12,7 +12,7 @@ xcuserdata/
 /*.xcodeproj
 
 # App bundle
-DesktoppetSwift.app/
+Meowpal.app/
 
 # macOS
 .DS_Store
@@ -69,3 +69,12 @@ CLAUDE.md
 
 # Release archives (regenerated on build)
 *.zip
+
+# Local development files (not for git)
+sprite-editor/
+openspec/
+menubar_iconTemplate.png
+menubar_iconTemplate@2x.png
+meowsave.skill
+scripts/
+skills/

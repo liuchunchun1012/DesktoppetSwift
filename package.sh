@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Configuration
-APP_NAME="DesktoppetSwift"
+APP_NAME="Meowpal"
 APP_DIR="${APP_NAME}.app"
-SOURCES_DIR="Sources/DesktoppetSwift"
+SOURCES_DIR="Sources/Meowpal"
 SPRITES_DIR="${SOURCES_DIR}/Resources"
 
 # 1. Build the executable

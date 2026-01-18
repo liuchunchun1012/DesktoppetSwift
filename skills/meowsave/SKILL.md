@@ -1,15 +1,15 @@
 ---
 name: meowsave
-description: Save conversations and notes to Obsidian via the desktop cat (DesktoppetSwift). Use this skill when the user wants to (1) save the current conversation, (2) send content to Obsidian, (3) preserve important discussions or notes, or (4) explicitly mentions "meowsave", "send to cat", "save to obsidian", or similar phrases. Works with both direct script execution and MCP server integration.
+description: Save conversations and notes to Obsidian via the desktop cat (Meowpal). Use this skill when the user wants to (1) save the current conversation, (2) send content to Obsidian, (3) preserve important discussions or notes, or (4) explicitly mentions "meowsave", "send to cat", "save to obsidian", or similar phrases. Works with both direct script execution and MCP server integration.
 ---
 
 # MeowSave - Save to Obsidian via Desktop Cat
 
-Save Claude Code conversations and notes to your Obsidian Vault through the DesktoppetSwift desktop pet.
+Save Claude Code conversations and notes to your Obsidian Vault through the Meowpal desktop pet.
 
 ## Prerequisites
 
-- **DesktoppetSwift** must be running (listens on http://127.0.0.1:1012)
+- **Meowpal** must be running (listens on http://127.0.0.1:1012)
 - Desktop cat must have **Obsidian Vault path** configured
 
 ## Quick Usage
@@ -104,7 +104,7 @@ Use meowsave when:
 
 If connection fails:
 
-1. Verify DesktoppetSwift is running
+1. Verify Meowpal is running
 2. Check that the HTTP server is enabled (port 1012)
 3. Ensure Obsidian Vault path is configured in the desktop cat settings
 4. Run `python3 scripts/send_to_meow.py --check` to diagnose

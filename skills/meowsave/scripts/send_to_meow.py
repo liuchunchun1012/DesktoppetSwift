@@ -50,7 +50,7 @@ def send_to_meow(content=None, title=None, context=None, messages=None, source="
     except urllib.error.URLError as e:
         return {
             "success": False,
-            "message": f"无法连接到小猫：{e.reason}。请确保 DesktoppetSwift 正在运行。"
+            "message": f"无法连接到小猫：{e.reason}。请确保 Meowpal 正在运行。"
         }
     except Exception as e:
         return {
@@ -84,7 +84,7 @@ def main():
             print("✅ 小猫 HTTP 网关运行中")
             sys.exit(0)
         else:
-            print("❌ 无法连接到小猫，请确保 DesktoppetSwift 正在运行")
+            print("❌ 无法连接到小猫，请确保 Meowpal 正在运行")
             sys.exit(1)
     
     if not args.content and not args.messages:
