@@ -1,4 +1,4 @@
-# Meowpal 🐱 v2.0
+# Meowpal 🐱
 
 A cute, AI-powered macOS desktop pet! Lives on your screen, ready to chat and help you work.
 
