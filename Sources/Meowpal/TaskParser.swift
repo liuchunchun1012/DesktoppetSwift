@@ -7,27 +7,26 @@ class TaskParser {
     
     private init() {}
     
-    /// 检查消息是否是任务命令
+    /// 检查消息是否是任务命令（以 + 开头）
     static func isTaskCommand(_ message: String) -> Bool {
-        let prefixes = ["Add task: ", "Add task:", "记任务 ", "Add task: ", "Add task:"]
-        return prefixes.contains { message.hasPrefix($0) }
+        let trimmed = message.trimmingCharacters(in: .whitespaces)
+        return trimmed.hasPrefix("+")
     }
-    
-    /// 提取任务内容（去掉前缀）
+
+    /// 提取任务内容（去掉 + 前缀）
     static func extractTaskContent(_ message: String) -> String {
-        let prefixes = ["Add task: ", "Add task:", "记任务 ", "Add task: ", "Add task:"]
-        for prefix in prefixes {
-            if message.hasPrefix(prefix) {
-                return String(message.dropFirst(prefix.count))
-            }
+        let trimmed = message.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("+") {
+            let content = String(trimmed.dropFirst())
+            return content.trimmingCharacters(in: .whitespaces)
         }
         return message
     }
     
-    /// 解析任务并创建到 Notion（支持一次创建多个任务）
-    func parseAndCreate(_ content: String, completion: @escaping (Result<[TodoTask], Error>) -> Void) {
+    /// 仅解析任务（不保存，返回解析后的任务列表）
+    func parseOnly(_ content: String, completion: @escaping (Result<[TodoTask], Error>) -> Void) {
         let prompt = buildExtractionPrompt(content)
-        
+
         AIProviderManager.shared.chatStream(
             message: prompt,
             onUpdate: { _ in },
@@ -35,27 +34,32 @@ class TaskParser {
                 switch result {
                 case .success(let response):
                     let tasks = self?.parseAIResponseMultiple(response, originalContent: content) ?? []
-                    
+
                     if tasks.isEmpty {
                         // 解析失败，使用原始内容创建一个简单任务
                         let simpleTask = TodoTask(name: content)
-                        NotionClient.shared.createTask(simpleTask) { notionResult in
-                            switch notionResult {
-                            case .success:
-                                completion(.success([simpleTask]))
-                            case .failure(let error):
-                                completion(.failure(error))
-                            }
-                        }
+                        completion(.success([simpleTask]))
                     } else {
-                        // 批量创建任务
-                        self?.createTasksSequentially(tasks, completion: completion)
+                        completion(.success(tasks))
                     }
                 case .failure(let error):
                     completion(.failure(error))
                 }
             }
         )
+    }
+
+    /// 解析任务并创建到 Notion（支持一次创建多个任务）
+    /// 注意：此方法仅保存到 Notion，如需同时保存到 Obsidian，请使用 parseOnly 后自行处理
+    func parseAndCreate(_ content: String, completion: @escaping (Result<[TodoTask], Error>) -> Void) {
+        parseOnly(content) { [weak self] result in
+            switch result {
+            case .success(let tasks):
+                self?.createTasksSequentially(tasks, completion: completion)
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
     }
     
     /// 顺序创建多个任务

@@ -98,7 +98,7 @@ class AIProviderManager: ObservableObject {
         onUpdate: @escaping (String) -> Void,
         onComplete: @escaping (Result<String, Error>) -> Void
     ) {
-        // 检测任务命令：记任务：xxx
+        // 检测任务命令：以 + 开头
         if TaskParser.isTaskCommand(message) {
             let taskContent = TaskParser.extractTaskContent(message)
             handleTaskCommand(taskContent, onUpdate: onUpdate, onComplete: onComplete)
@@ -141,32 +141,138 @@ class AIProviderManager: ObservableObject {
         onUpdate: @escaping (String) -> Void,
         onComplete: @escaping (Result<String, Error>) -> Void
     ) {
-        // 检查是否配置了 TodoList
-        guard !UserSettings.shared.todoListDatabaseId.isEmpty else {
-            onComplete(.success("Meow~ You haven't configured TodoList yet! Please set TodoList Database ID in Settings~"))
-            return
-        }
-        
-        onUpdate("正在解析并记录任务...")
-        
-        TaskParser.shared.parseAndCreate(content) { result in
-            switch result {
-            case .success(let tasks):
-                if tasks.count == 1 {
-                    let task = tasks[0]
-                    let response = "已记录！\n任务：\(task.name)\n优先级：\(task.priority)\n类型：\(task.type)"
-                    onComplete(.success(response))
-                } else {
-                    var response = "已记录 \(tasks.count) 个任务！\n"
-                    for (index, task) in tasks.enumerated() {
-                        response += "\n\(index + 1). \(task.name)（\(task.type)）"
-                    }
-                    onComplete(.success(response))
-                }
-            case .failure(let error):
-                onComplete(.success("喵呜...记录任务失败了：\(error.localizedDescription)"))
+        let destination = UserSettings.shared.taskDestination
+        let notionConfigured = !UserSettings.shared.todoListDatabaseId.isEmpty
+        let obsidianConfigured = ObsidianClient.shared.isConfigured()
+
+        // 检查是否配置了目标
+        switch destination {
+        case .notion:
+            guard notionConfigured else {
+                onComplete(.success("❌ Notion TodoList not configured. Please set Database ID in Settings."))
+                return
+            }
+        case .obsidian:
+            guard obsidianConfigured else {
+                onComplete(.success("❌ Obsidian not configured. Please set Vault path in Settings."))
+                return
+            }
+        case .both:
+            if !notionConfigured && !obsidianConfigured {
+                onComplete(.success("❌ Neither Notion nor Obsidian is configured. Please set up in Settings."))
+                return
             }
         }
+
+        onUpdate("Parsing task...")
+
+        TaskParser.shared.parseOnly(content) { [weak self] result in
+            switch result {
+            case .success(let tasks):
+                self?.saveTasks(tasks, destination: destination, notionConfigured: notionConfigured, obsidianConfigured: obsidianConfigured, onComplete: onComplete)
+            case .failure(let error):
+                onComplete(.success("❌ Failed to parse task: \(error.localizedDescription)"))
+            }
+        }
+    }
+
+    /// 保存任务到指定目标
+    private func saveTasks(
+        _ tasks: [TodoTask],
+        destination: TaskDestination,
+        notionConfigured: Bool,
+        obsidianConfigured: Bool,
+        onComplete: @escaping (Result<String, Error>) -> Void
+    ) {
+        var savedTo: [String] = []
+        let group = DispatchGroup()
+        var errors: [String] = []
+
+        // 保存到 Notion
+        if (destination == .notion || destination == .both) && notionConfigured {
+            group.enter()
+            saveTasksToNotion(tasks) { result in
+                switch result {
+                case .success:
+                    savedTo.append("Notion")
+                case .failure(let error):
+                    errors.append("Notion: \(error.localizedDescription)")
+                }
+                group.leave()
+            }
+        }
+
+        // 保存到 Obsidian
+        if (destination == .obsidian || destination == .both) && obsidianConfigured {
+            group.enter()
+            saveTasksToObsidian(tasks) { result in
+                switch result {
+                case .success:
+                    savedTo.append("Obsidian")
+                case .failure(let error):
+                    errors.append("Obsidian: \(error.localizedDescription)")
+                }
+                group.leave()
+            }
+        }
+
+        group.notify(queue: .main) {
+            if !errors.isEmpty {
+                onComplete(.success("⚠️ Partial save:\n" + errors.joined(separator: "\n")))
+            } else if tasks.count == 1 {
+                let task = tasks[0]
+                let response = "✅ Task added to \(savedTo.joined(separator: " & "))!\n📝 \(task.name)"
+                onComplete(.success(response))
+            } else {
+                var response = "✅ Added \(tasks.count) tasks to \(savedTo.joined(separator: " & "))!\n"
+                for (index, task) in tasks.enumerated() {
+                    response += "\n\(index + 1). \(task.name)"
+                }
+                onComplete(.success(response))
+            }
+        }
+    }
+
+    /// 保存任务到 Notion
+    private func saveTasksToNotion(_ tasks: [TodoTask], completion: @escaping (Result<Void, Error>) -> Void) {
+        var remaining = tasks
+        func saveNext() {
+            guard !remaining.isEmpty else {
+                completion(.success(()))
+                return
+            }
+            let task = remaining.removeFirst()
+            NotionClient.shared.createTask(task) { result in
+                switch result {
+                case .success:
+                    saveNext()
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+        }
+        saveNext()
+    }
+
+    /// 保存任务到 Obsidian
+    private func saveTasksToObsidian(_ tasks: [TodoTask], completion: @escaping (Result<Void, Error>) -> Void) {
+        var remaining = tasks
+        func saveNext() {
+            guard !remaining.isEmpty else {
+                completion(.success(()))
+                return
+            }
+            let task = remaining.removeFirst()
+            ObsidianClient.shared.saveTask(task) { result in
+                switch result {
+                case .success:
+                    saveNext()
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+        }
+        saveNext()
     }
     
     /// 分析图片（流式）

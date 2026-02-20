@@ -556,87 +556,92 @@ struct ToolsSettingsTab: View {
         Form {
             // MARK: - 翻译设置
             Section {
-                Text("Translation Settings")
+                Text("Translation")
                     .font(.headline)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Target Language")
-                        .font(.subheadline)
-                    
-                    Picker("Target Language", selection: $settings.translationLanguage) {
-                        ForEach(TranslationLanguage.allCases) { lang in
-                            Text(lang.displayName).tag(lang)
-                        }
+                Picker("Target Language", selection: $settings.translationLanguage) {
+                    ForEach(TranslationLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
                     }
                 }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("How to use:")
-                        .font(.subheadline)
-                        .bold()
-                    Text("1. Copy the text you want to translate")
-                        .foregroundColor(.secondary)
-                    Text("2. Use the translate hotkey")
-                        .foregroundColor(.secondary)
-                    Text("3. Translation appears in chat bubble")
-                        .foregroundColor(.secondary)
-                }
+
+                Text("Use Cmd+Shift+T to translate copied text")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Divider()
-            
+
             // MARK: - 划词助手设置
             Section {
                 Text("Selection Assistant")
                     .font(.headline)
-                
+
                 Toggle("Enable Selection Assistant", isOn: $settings.selectionAssistantEnabled)
-                    .help("Use hotkey to trigger selection toolbar")
-                
-                if settings.selectionAssistantEnabled {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Enabled")
-                                .foregroundColor(.green)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("How to use:")
-                                .font(.subheadline)
-                                .bold()
-                            Text("1. Select any text and copy it")
-                                .foregroundColor(.secondary)
-                            Text("2. Use selection assistant hotkey")
-                                .foregroundColor(.secondary)
-                            Text("3. Choose: Translate, Explain, Summarize, Search")
-                                .foregroundColor(.secondary)
-                        }
+
+                Text("Select text → Copy → Cmd+Shift+K → Choose action")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Divider()
+
+            // MARK: - 任务设置
+            Section {
+                Text("Quick Task (+)")
+                    .font(.headline)
+
+                Picker("Save to", selection: $settings.taskDestination) {
+                    ForEach(TaskDestination.allCases, id: \.self) { dest in
+                        Text(dest.displayName).tag(dest)
                     }
                 }
+                .pickerStyle(.segmented)
+
+                if settings.taskDestination == .obsidian || settings.taskDestination == .both {
+                    TextField("Tasks File", text: $settings.obsidianTasksFile)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Text("Type '+Buy milk tomorrow 3pm' to add task")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            
+
             Divider()
-            
+
+            // MARK: - 每日总结设置
+            Section {
+                Text("Daily Summary")
+                    .font(.headline)
+
+                Picker("Save to", selection: $settings.summaryDestination) {
+                    ForEach(TaskDestination.allCases, id: \.self) { dest in
+                        Text(dest.displayName).tag(dest)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if settings.summaryDestination == .obsidian || settings.summaryDestination == .both {
+                    TextField("Daily Notes Folder", text: $settings.obsidianDailyNotesFolder)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Text("Menu → Sync Daily Summary")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Divider()
+
             // MARK: - 图像分析说明
             Section {
                 Text("Image Analysis")
                     .font(.headline)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("How to use:")
-                        .font(.subheadline)
-                        .bold()
-                    Text("1. Take a screenshot to clipboard")
-                        .foregroundColor(.secondary)
-                    Text("2. Use image analysis hotkey")
-                        .foregroundColor(.secondary)
-                    Text("3. Enter your question")
-                        .foregroundColor(.secondary)
-                    Text("4. Your pet will analyze and answer")
-                        .foregroundColor(.secondary)
-                }
+
+                Text("Screenshot → Cmd+Shift+L → Ask question")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Spacer()
@@ -1043,7 +1048,7 @@ struct NotionSettingsTab: View {
                             .font(.subheadline)
                         TextField("Todo Database ID", text: $settings.todoListDatabaseId)
                             .textFieldStyle(.roundedBorder)
-                        Text("Used for creating tasks via 'Task:' command")
+                        Text("Used for creating tasks via '+' command")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

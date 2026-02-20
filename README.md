@@ -20,8 +20,9 @@ A cute, AI-powered macOS desktop pet! Lives on your screen, ready to chat and he
 - 🔄 **40+ Translation Languages** - Supports all major world languages (English, 简体中文, 繁體中文, Español, Français, Deutsch, 日本語, 한국어, and many more)
 
 ### Sync & Integrations
-- 📓 **Obsidian Integration** - Auto-sync chats to Obsidian vault, one-click save valuable conversations
-- 📝 **Notion Integration** - Daily chat summaries auto-sync to Notion, supports TodoList task creation
+- 📓 **Obsidian Integration** - Save chats, daily summaries, and tasks to Obsidian vault
+- 📝 **Notion Integration** - Daily summaries and TodoList task creation
+- 🔄 **Flexible Sync** - Choose to sync to Notion, Obsidian, or both
 
 ## 🎬 More Demos
 
@@ -166,6 +167,19 @@ Opens input box. Type and press Enter, your pet responds with AI. Supports follo
 1. Select any text → `Cmd+C` to copy
 2. Press `Cmd+Shift+K`, toolbar appears near cursor
 3. Click: Translate / Explain / Summarize / Search
+
+#### ➕ Quick Add Task
+Start your message with `+` to create a task:
+```
++Buy groceries tomorrow 3pm
++Meeting with team Friday 10am-11am
++Finish report by end of week
+```
+AI will parse time, priority, and add it to your task list automatically.
+
+**Save to:** Notion, Obsidian, or Both (choose in Settings → Tools)
+- **Notion**: Creates structured database entry
+- **Obsidian**: Appends to Tasks.md in [Obsidian Tasks](https://obsidian-tasks-group.github.io/obsidian-tasks/) format
 
 ### 💾 One-Click Save to Obsidian
 

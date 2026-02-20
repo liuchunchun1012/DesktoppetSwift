@@ -198,7 +198,175 @@ class ObsidianClient {
         let folder = UserSettings.shared.obsidianQuickSaveFolder
         return folder.isEmpty ? "QuickNotes" : folder
     }
-    
+
+    // MARK: - Daily Summary Methods
+
+    /// 保存每日总结到 Obsidian Daily Notes
+    func saveDailySummary(_ summary: DailySummary, completion: @escaping (Result<String, Error>) -> Void) {
+        guard isConfigured() else {
+            completion(.failure(ObsidianError.notConfigured))
+            return
+        }
+
+        let folder = UserSettings.shared.obsidianDailyNotesFolder
+        let fileName = dailyNoteFileName()
+        let content = formatDailySummary(summary)
+
+        do {
+            try writeOrAppendDailyNote(content: content, fileName: fileName, folder: folder)
+            print("[ObsidianClient] Daily summary saved: \(fileName)")
+            completion(.success(fileName))
+        } catch {
+            completion(.failure(error))
+        }
+    }
+
+    /// 格式化每日总结为 Markdown
+    private func formatDailySummary(_ summary: DailySummary) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        let timeString = formatter.string(from: Date())
+
+        var markdown = """
+        ## \(timeString) - \(summary.title)
+
+        \(summary.content)
+
+        """
+
+        if !summary.highlights.isEmpty {
+            markdown += "**Highlights:** " + summary.highlights.joined(separator: ", ") + "\n\n"
+        }
+
+        markdown += "**Mood:** \(summary.mood) | **Category:** \(summary.category)\n\n---\n"
+
+        return markdown
+    }
+
+    /// 获取今日 Daily Note 文件名
+    private func dailyNoteFileName() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date()) + ".md"
+    }
+
+    /// 写入或追加到 Daily Note
+    private func writeOrAppendDailyNote(content: String, fileName: String, folder: String) throws {
+        var targetURL = vaultURL()
+        if !folder.isEmpty {
+            targetURL = targetURL.appendingPathComponent(folder)
+            if !fileManager.fileExists(atPath: targetURL.path) {
+                try fileManager.createDirectory(at: targetURL, withIntermediateDirectories: true)
+            }
+        }
+
+        let fileURL = targetURL.appendingPathComponent(fileName)
+
+        // 如果文件不存在，创建带标题的新文件
+        if !fileManager.fileExists(atPath: fileURL.path) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let dateString = formatter.string(from: Date())
+
+            let header = """
+            ---
+            date: \(dateString)
+            tags: [daily-note, meowpal]
+            ---
+
+            # \(dateString)
+
+            """
+            try header.write(to: fileURL, atomically: true, encoding: .utf8)
+        }
+
+        // 读取现有内容并追加
+        var existingContent = try String(contentsOf: fileURL, encoding: .utf8)
+        if !existingContent.hasSuffix("\n") {
+            existingContent += "\n"
+        }
+        existingContent += content
+
+        try existingContent.write(to: fileURL, atomically: true, encoding: .utf8)
+    }
+
+    // MARK: - Task Methods
+
+    /// 保存任务到 Obsidian (Obsidian Tasks 格式)
+    /// 格式: - [ ] Task name 📅 2025-01-20 ⏰ 15:00
+    func saveTask(_ task: TodoTask, completion: @escaping (Result<String, Error>) -> Void) {
+        guard isConfigured() else {
+            completion(.failure(ObsidianError.notConfigured))
+            return
+        }
+
+        let tasksFile = UserSettings.shared.obsidianTasksFile
+        let taskLine = formatTaskLine(task)
+
+        do {
+            try appendToTasksFile(taskLine, fileName: tasksFile)
+            print("[ObsidianClient] Task saved: \(task.name)")
+            completion(.success(tasksFile))
+        } catch {
+            completion(.failure(error))
+        }
+    }
+
+    /// 格式化任务为 Obsidian Tasks 格式
+    private func formatTaskLine(_ task: TodoTask) -> String {
+        var line = "- [ ] \(task.name)"
+
+        // 添加日期 📅
+        if let dueDate = task.dueDate {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            line += " 📅 \(formatter.string(from: dueDate))"
+        } else if let startDate = task.startDate {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            line += " 📅 \(formatter.string(from: startDate))"
+        }
+
+        // 添加时间 ⏰ (如果有具体时间)
+        if let startDate = task.startDate {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            let timeStr = formatter.string(from: startDate)
+            if timeStr != "00:00" {
+                line += " ⏰ \(timeStr)"
+            }
+        }
+
+        // 添加优先级标签
+        if task.priority == "高" || task.priority == "High" {
+            line += " ⏫"
+        } else if task.priority == "低" || task.priority == "Low" {
+            line += " 🔽"
+        }
+
+        return line
+    }
+
+    /// 追加内容到任务文件
+    private func appendToTasksFile(_ content: String, fileName: String) throws {
+        let fileURL = vaultURL().appendingPathComponent(fileName)
+
+        // 如果文件不存在，创建带标题的新文件
+        if !fileManager.fileExists(atPath: fileURL.path) {
+            let header = "# Tasks\n\n"
+            try header.write(to: fileURL, atomically: true, encoding: .utf8)
+        }
+
+        // 读取现有内容并追加
+        var existingContent = try String(contentsOf: fileURL, encoding: .utf8)
+        if !existingContent.hasSuffix("\n") {
+            existingContent += "\n"
+        }
+        existingContent += content + "\n"
+
+        try existingContent.write(to: fileURL, atomically: true, encoding: .utf8)
+    }
+
     // MARK: - Private Methods
     
     private func vaultURL() -> URL {

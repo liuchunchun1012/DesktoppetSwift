@@ -68,6 +68,21 @@ struct HotkeyConfig: Codable, Equatable {
     }
 }
 
+/// 任务保存目标
+enum TaskDestination: String, CaseIterable {
+    case notion = "notion"
+    case obsidian = "obsidian"
+    case both = "both"
+
+    var displayName: String {
+        switch self {
+        case .notion: return "Notion"
+        case .obsidian: return "Obsidian"
+        case .both: return "Both"
+        }
+    }
+}
+
 /// 用户设置管理器
 /// 使用 UserDefaults 持久化非敏感配置
 class UserSettings: ObservableObject {
@@ -95,6 +110,10 @@ class UserSettings: ObservableObject {
         static let obsidianChatLogFolder = "obsidianChatLogFolder"
         static let obsidianQuickSaveFolder = "obsidianQuickSaveFolder"
         static let selectionAssistantEnabled = "selectionAssistantEnabled"
+        static let taskDestination = "taskDestination"
+        static let obsidianTasksFile = "obsidianTasksFile"
+        static let summaryDestination = "summaryDestination"
+        static let obsidianDailyNotesFolder = "obsidianDailyNotesFolder"
         // 快捷键配置
         static let hotkeyChat = "hotkeyChat"
         static let hotkeyTranslate = "hotkeyTranslate"
@@ -235,7 +254,35 @@ class UserSettings: ObservableObject {
             }
         }
     }
-    
+
+    /// 任务保存目标 (Notion / Obsidian / Both)
+    @Published var taskDestination: TaskDestination {
+        didSet {
+            defaults.set(taskDestination.rawValue, forKey: Keys.taskDestination)
+        }
+    }
+
+    /// Obsidian 任务文件路径 (相对于 Vault)
+    @Published var obsidianTasksFile: String {
+        didSet {
+            defaults.set(obsidianTasksFile, forKey: Keys.obsidianTasksFile)
+        }
+    }
+
+    /// 每日总结保存目标 (Notion / Obsidian / Both)
+    @Published var summaryDestination: TaskDestination {
+        didSet {
+            defaults.set(summaryDestination.rawValue, forKey: Keys.summaryDestination)
+        }
+    }
+
+    /// Obsidian Daily Notes 文件夹路径 (相对于 Vault)
+    @Published var obsidianDailyNotesFolder: String {
+        didSet {
+            defaults.set(obsidianDailyNotesFolder, forKey: Keys.obsidianDailyNotesFolder)
+        }
+    }
+
     // MARK: - 快捷键配置
     
     /// 对话快捷键 (默认: J)
@@ -335,7 +382,25 @@ class UserSettings: ObservableObject {
         
         // 加载划词助手配置（默认关闭）
         self.selectionAssistantEnabled = defaults.bool(forKey: Keys.selectionAssistantEnabled)
-        
+
+        // 加载任务保存目标配置（默认 Notion）
+        if let destRaw = defaults.string(forKey: Keys.taskDestination),
+           let dest = TaskDestination(rawValue: destRaw) {
+            self.taskDestination = dest
+        } else {
+            self.taskDestination = .notion
+        }
+        self.obsidianTasksFile = defaults.string(forKey: Keys.obsidianTasksFile) ?? "Tasks.md"
+
+        // 加载每日总结保存目标配置（默认 Notion）
+        if let summaryDestRaw = defaults.string(forKey: Keys.summaryDestination),
+           let summaryDest = TaskDestination(rawValue: summaryDestRaw) {
+            self.summaryDestination = summaryDest
+        } else {
+            self.summaryDestination = .notion
+        }
+        self.obsidianDailyNotesFolder = defaults.string(forKey: Keys.obsidianDailyNotesFolder) ?? "DailyNotes"
+
         // 加载快捷键配置
         self.hotkeyChat = Self.loadHotkeyConfig(from: defaults, key: Keys.hotkeyChat, default: .defaultChat)
         self.hotkeyTranslate = Self.loadHotkeyConfig(from: defaults, key: Keys.hotkeyTranslate, default: .defaultTranslate)

@@ -7,26 +7,46 @@ class DailySummaryGenerator {
     
     private init() {}
     
-    /// 生成今日总结并发送到 Notion（支持合并和 TodoList 整合）
+    /// 生成今日总结并发送到配置的目标（Notion / Obsidian / Both）
     func generateAndPost(completion: @escaping (Result<DailySummary, Error>) -> Void) {
         let logs = ChatLogManager.shared.getUnsyncedToNotion()
-        
+
         guard !logs.isEmpty else {
             completion(.failure(SummaryError.noConversations))
             return
         }
-        
-        // Step 1: 查询 TodoList 任务
-        NotionClient.shared.queryTodayTasks { [weak self] tasksResult in
-            let tasks = (try? tasksResult.get()) ?? []
-            
-            // Step 2: 查询是否已有今日日志
-            NotionClient.shared.queryTodayLog { existingLogResult in
-                let existingLog = try? existingLogResult.get()
-                
-                // Step 3: 构建 AI 提示词（包含任务信息）
+
+        let destination = UserSettings.shared.summaryDestination
+        let notionConfigured = !UserSettings.shared.notionDatabaseId.isEmpty
+        let obsidianConfigured = ObsidianClient.shared.isConfigured()
+
+        // Step 1: 查询 TodoList 任务 (仅当需要 Notion 时)
+        let queryTasks: (@escaping ([TaskSummaryItem]) -> Void) -> Void = { callback in
+            if (destination == .notion || destination == .both) && notionConfigured {
+                NotionClient.shared.queryTodayTasks { result in
+                    callback((try? result.get()) ?? [])
+                }
+            } else {
+                callback([])
+            }
+        }
+
+        queryTasks { [weak self] tasks in
+            // Step 2: 查询是否已有今日 Notion 日志
+            let queryLog: (@escaping (ExistingLogPage?) -> Void) -> Void = { callback in
+                if (destination == .notion || destination == .both) && notionConfigured {
+                    NotionClient.shared.queryTodayLog { result in
+                        callback(try? result.get())
+                    }
+                } else {
+                    callback(nil)
+                }
+            }
+
+            queryLog { existingLog in
+                // Step 3: 构建 AI 提示词
                 let prompt = self?.buildPromptWithTasks(from: logs, tasks: tasks, existingContent: existingLog?.content) ?? ""
-                
+
                 // Step 4: 调用 AI 生成总结
                 AIProviderManager.shared.chatStream(
                     message: prompt,
@@ -35,36 +55,8 @@ class DailySummaryGenerator {
                         switch result {
                         case .success(let response):
                             if let summary = self?.parseResponse(response) {
-                                // Step 5: 根据是否有现有日志决定更新还是创建
-                                if let existingPage = existingLog {
-                                    // 更新现有日志
-                                    print("[DailySummaryGenerator] Updating existing log: \(existingPage.id)")
-                                    NotionClient.shared.updatePageContent(
-                                        pageId: existingPage.id,
-                                        newContent: summary.content,
-                                        newTags: summary.highlights
-                                    ) { updateResult in
-                                        switch updateResult {
-                                        case .success:
-                                            ChatLogManager.shared.markSyncedToNotion()
-                                            completion(.success(summary))
-                                        case .failure(let error):
-                                            completion(.failure(error))
-                                        }
-                                    }
-                                } else {
-                                    // 创建新日志
-                                    print("[DailySummaryGenerator] Creating new log")
-                                    NotionClient.shared.postDailySummary(summary) { notionResult in
-                                        switch notionResult {
-                                        case .success:
-                                            ChatLogManager.shared.markSyncedToNotion()
-                                            completion(.success(summary))
-                                        case .failure(let error):
-                                            completion(.failure(error))
-                                        }
-                                    }
-                                }
+                                // Step 5: 保存到配置的目标
+                                self?.saveSummary(summary, destination: destination, notionConfigured: notionConfigured, obsidianConfigured: obsidianConfigured, existingLog: existingLog, completion: completion)
                             } else {
                                 completion(.failure(SummaryError.parseError))
                             }
@@ -73,6 +65,76 @@ class DailySummaryGenerator {
                         }
                     }
                 )
+            }
+        }
+    }
+
+    /// 保存总结到配置的目标
+    private func saveSummary(
+        _ summary: DailySummary,
+        destination: TaskDestination,
+        notionConfigured: Bool,
+        obsidianConfigured: Bool,
+        existingLog: ExistingLogPage?,
+        completion: @escaping (Result<DailySummary, Error>) -> Void
+    ) {
+        let group = DispatchGroup()
+        var errors: [String] = []
+        var savedTo: [String] = []
+
+        // 保存到 Notion
+        if (destination == .notion || destination == .both) && notionConfigured {
+            group.enter()
+            if let existingPage = existingLog {
+                NotionClient.shared.updatePageContent(
+                    pageId: existingPage.id,
+                    newContent: summary.content,
+                    newTags: summary.highlights
+                ) { result in
+                    switch result {
+                    case .success:
+                        savedTo.append("Notion")
+                    case .failure(let error):
+                        errors.append("Notion: \(error.localizedDescription)")
+                    }
+                    group.leave()
+                }
+            } else {
+                NotionClient.shared.postDailySummary(summary) { result in
+                    switch result {
+                    case .success:
+                        savedTo.append("Notion")
+                    case .failure(let error):
+                        errors.append("Notion: \(error.localizedDescription)")
+                    }
+                    group.leave()
+                }
+            }
+        }
+
+        // 保存到 Obsidian
+        if (destination == .obsidian || destination == .both) && obsidianConfigured {
+            group.enter()
+            ObsidianClient.shared.saveDailySummary(summary) { result in
+                switch result {
+                case .success:
+                    savedTo.append("Obsidian")
+                case .failure(let error):
+                    errors.append("Obsidian: \(error.localizedDescription)")
+                }
+                group.leave()
+            }
+        }
+
+        group.notify(queue: .main) {
+            if !savedTo.isEmpty {
+                ChatLogManager.shared.markSyncedToNotion()
+                print("[DailySummaryGenerator] Saved to: \(savedTo.joined(separator: ", "))")
+                completion(.success(summary))
+            } else if !errors.isEmpty {
+                completion(.failure(SummaryError.saveError(errors.joined(separator: "; "))))
+            } else {
+                completion(.failure(SummaryError.noDestination))
             }
         }
     }
@@ -252,13 +314,19 @@ class DailySummaryGenerator {
 enum SummaryError: Error, LocalizedError {
     case noConversations
     case parseError
-    
+    case saveError(String)
+    case noDestination
+
     var errorDescription: String? {
         switch self {
         case .noConversations:
             return "No conversations recorded today!"
         case .parseError:
-            return "AI 返回的格式无法解析"
+            return "Failed to parse AI response"
+        case .saveError(let details):
+            return "Save failed: \(details)"
+        case .noDestination:
+            return "No destination configured. Please set up Notion or Obsidian in Settings."
         }
     }
 }
