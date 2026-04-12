@@ -17,6 +17,7 @@ class GeminiClient: NSObject, AIProvider, URLSessionDataDelegate {
     private var onStreamUpdate: ((String) -> Void)?
     private var onStreamComplete: ((Result<String, Error>) -> Void)?
     private var accumulatedData = Data()
+    private var httpStatusCode: Int = 0
 
     // MARK: - Initialization
 
@@ -220,6 +221,7 @@ class GeminiClient: NSObject, AIProvider, URLSessionDataDelegate {
         self.onStreamComplete = onComplete
         self.fullResponse = ""
         self.accumulatedData = Data()
+        self.httpStatusCode = 0
         
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 120
@@ -231,8 +233,22 @@ class GeminiClient: NSObject, AIProvider, URLSessionDataDelegate {
     
     // MARK: - URLSessionDataDelegate
     
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        if let httpResponse = response as? HTTPURLResponse {
+            httpStatusCode = httpResponse.statusCode
+            print("[GeminiClient] HTTP Status: \(httpStatusCode)")
+        }
+        completionHandler(.allow)
+    }
+    
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         accumulatedData.append(data)
+        
+        // If HTTP status is not 200, don't try to parse as streaming content
+        // The error will be handled in didCompleteWithError
+        if httpStatusCode != 200 && httpStatusCode != 0 {
+            return
+        }
         
         // 尝试解析收到的数据
         guard let text = String(data: accumulatedData, encoding: .utf8) else {
@@ -291,54 +307,92 @@ class GeminiClient: NSObject, AIProvider, URLSessionDataDelegate {
                 self.onStreamComplete?(.failure(AIProviderError.networkError(error)))
             }
         } else {
-            // 最终解析完整响应
-            guard let text = String(data: accumulatedData, encoding: .utf8) else {
-                print("[GeminiClient] Failed to decode final data")
-                DispatchQueue.main.async {
-                    self.onStreamComplete?(.failure(AIProviderError.invalidResponse))
+            // Check HTTP status code first
+            if httpStatusCode != 200 && httpStatusCode != 0 {
+                let rawBody = String(data: accumulatedData, encoding: .utf8) ?? "No body"
+                print("[GeminiClient] HTTP Error \(httpStatusCode): \(rawBody.prefix(500))")
+                
+                // Try to extract error message from response body
+                var errorMessage = "HTTP \(httpStatusCode)"
+                
+                // Try parsing as single JSON object {"error": {...}}
+                if let errorJson = try? JSONSerialization.jsonObject(with: accumulatedData) as? [String: Any],
+                   let errorObj = errorJson["error"] as? [String: Any],
+                   let message = errorObj["message"] as? String {
+                    errorMessage = message
                 }
-                return
-            }
-            
-            print("[GeminiClient] Final data: \(text.prefix(500))...")
-            
-            // 检查是否有错误响应
-            if let errorData = accumulatedData as Data?,
-               let errorJson = try? JSONSerialization.jsonObject(with: errorData) as? [String: Any],
-               let error = errorJson["error"] as? [String: Any],
-               let message = error["message"] as? String {
-                print("[GeminiClient] API Error: \(message)")
-                DispatchQueue.main.async {
-                    self.onStreamComplete?(.failure(AIProviderError.serverError(message)))
+                // Try parsing as JSON array [{"error": {...}}]
+                else if let errorArray = try? JSONSerialization.jsonObject(with: accumulatedData) as? [[String: Any]],
+                        let firstItem = errorArray.first,
+                        let errorObj = firstItem["error"] as? [String: Any],
+                        let message = errorObj["message"] as? String {
+                    errorMessage = message
                 }
-                return
-            }
-            
-            // 尝试解析最终的 JSON 数组
-            if let json = try? JSONSerialization.jsonObject(with: accumulatedData) as? [[String: Any]] {
-                var finalText = ""
-                for item in json {
-                    if let candidates = item["candidates"] as? [[String: Any]],
-                       let firstCandidate = candidates.first,
-                       let content = firstCandidate["content"] as? [String: Any],
-                       let parts = content["parts"] as? [[String: Any]] {
-                        for part in parts {
-                            if let partText = part["text"] as? String {
-                                finalText += partText
+                
+                let finalError: AIProviderError = httpStatusCode == 429
+                    ? .rateLimited
+                    : .serverError(errorMessage)
+                
+                DispatchQueue.main.async {
+                    self.onStreamComplete?(.failure(finalError))
+                }
+            } else {
+                // 最终解析完整响应
+                guard let text = String(data: accumulatedData, encoding: .utf8) else {
+                    print("[GeminiClient] Failed to decode final data")
+                    DispatchQueue.main.async {
+                        self.onStreamComplete?(.failure(AIProviderError.invalidResponse))
+                    }
+                    return
+                }
+                
+                print("[GeminiClient] Final data: \(text.prefix(500))...")
+                
+                // 检查是否有错误响应（嵌在正常 JSON 中）
+                if let errorJson = try? JSONSerialization.jsonObject(with: accumulatedData) as? [String: Any],
+                   let errorObj = errorJson["error"] as? [String: Any],
+                   let message = errorObj["message"] as? String {
+                    print("[GeminiClient] API Error: \(message)")
+                    DispatchQueue.main.async {
+                        self.onStreamComplete?(.failure(AIProviderError.serverError(message)))
+                    }
+                    return
+                }
+                
+                // 尝试解析最终的 JSON 数组
+                if let json = try? JSONSerialization.jsonObject(with: accumulatedData) as? [[String: Any]] {
+                    var finalText = ""
+                    for item in json {
+                        if let candidates = item["candidates"] as? [[String: Any]],
+                           let firstCandidate = candidates.first,
+                           let content = firstCandidate["content"] as? [String: Any],
+                           let parts = content["parts"] as? [[String: Any]] {
+                            for part in parts {
+                                if let partText = part["text"] as? String {
+                                    finalText += partText
+                                }
                             }
                         }
                     }
+                    if !finalText.isEmpty {
+                        fullResponse = finalText
+                    }
                 }
-                if !finalText.isEmpty {
-                    fullResponse = finalText
+                
+                print("[GeminiClient] Final response: \(fullResponse.prefix(200))...")
+                
+                // If we still have no response, report an error instead of empty success
+                if fullResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    print("[GeminiClient] Empty response received")
+                    DispatchQueue.main.async {
+                        self.onStreamComplete?(.failure(AIProviderError.invalidResponse))
+                    }
+                } else {
+                    let cleaned = cleanModelOutput(fullResponse)
+                    DispatchQueue.main.async {
+                        self.onStreamComplete?(.success(cleaned))
+                    }
                 }
-            }
-            
-            print("[GeminiClient] Final response: \(fullResponse.prefix(200))...")
-            
-            let cleaned = cleanModelOutput(fullResponse)
-            DispatchQueue.main.async {
-                self.onStreamComplete?(.success(cleaned))
             }
         }
         

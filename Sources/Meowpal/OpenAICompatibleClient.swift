@@ -18,6 +18,7 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
     private var fullResponse = ""
     private var onStreamUpdate: ((String) -> Void)?
     private var onStreamComplete: ((Result<String, Error>) -> Void)?
+    private var httpStatusCode: Int = 0
 
     // MARK: - Initialization
 
@@ -299,11 +300,11 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
             return
         }
         
-        // 存储回调
         self.onStreamUpdate = onUpdate
         self.onStreamComplete = onComplete
         self.fullResponse = ""
         self.receiveBuffer = Data()
+        self.httpStatusCode = 0
         
         print("[OpenAIClient] Sending request to \(url)")
         
@@ -317,6 +318,14 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
     }
     
     // MARK: - URLSessionDataDelegate
+    
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        if let httpResponse = response as? HTTPURLResponse {
+            httpStatusCode = httpResponse.statusCode
+            print("[OpenAIClient] HTTP Status: \(httpStatusCode)")
+        }
+        completionHandler(.allow)
+    }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         receiveBuffer.append(data)
@@ -409,16 +418,33 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
                 self.onStreamComplete?(.failure(error))
             }
         } else {
-            // 最后的状态检查
-            if let httpResponse = task.response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+            // Check HTTP status code 
+            let statusCode = httpStatusCode != 0 ? httpStatusCode :
+                (task.response as? HTTPURLResponse)?.statusCode ?? 200
+
+            if statusCode != 200 {
                 let rawBody = String(data: receiveBuffer, encoding: .utf8) ?? "None"
-                print("[OpenAIClient] HTTP ERROR \(httpResponse.statusCode). Raw Body: \(rawBody)")
+                print("[OpenAIClient] HTTP ERROR \(statusCode). Raw Body: \(rawBody)")
                 
-                // 尝试从 Body 里提取错误消息
+                // Try to extract error message from body
+                var errorMessage = "HTTP \(statusCode): \(rawBody)"
+                if let errorJson = try? JSONSerialization.jsonObject(with: receiveBuffer) as? [String: Any],
+                   let errorObj = errorJson["error"] as? [String: Any],
+                   let message = errorObj["message"] as? String {
+                    errorMessage = message
+                }
+                
+                let finalError: Error = statusCode == 429
+                    ? AIProviderError.rateLimited
+                    : NSError(domain: "AIProvider", code: statusCode, userInfo: [NSLocalizedDescriptionKey: errorMessage])
+                
                 DispatchQueue.main.async {
-                    if self.onStreamComplete != nil {
-                        self.onStreamComplete?(.failure(NSError(domain: "AIProvider", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP \(httpResponse.statusCode): \(rawBody)"])))
-                    }
+                    self.onStreamComplete?(.failure(finalError))
+                }
+            } else if fullResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                print("[OpenAIClient] Empty response received")
+                DispatchQueue.main.async {
+                    self.onStreamComplete?(.failure(AIProviderError.invalidResponse))
                 }
             } else {
                 print("[OpenAIClient] Request completed successfully.")

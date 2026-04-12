@@ -17,6 +17,8 @@ class AnthropicClient: NSObject, AIProvider, URLSessionDataDelegate {
     private var fullResponse = ""
     private var onStreamUpdate: ((String) -> Void)?
     private var onStreamComplete: ((Result<String, Error>) -> Void)?
+    private var receiveBuffer = Data()
+    private var httpStatusCode: Int = 0
 
     // MARK: - Initialization
 
@@ -224,6 +226,8 @@ class AnthropicClient: NSObject, AIProvider, URLSessionDataDelegate {
         self.onStreamUpdate = onUpdate
         self.onStreamComplete = onComplete
         self.fullResponse = ""
+        self.receiveBuffer = Data()
+        self.httpStatusCode = 0
         
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 120
@@ -235,7 +239,23 @@ class AnthropicClient: NSObject, AIProvider, URLSessionDataDelegate {
     
     // MARK: - URLSessionDataDelegate
     
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        if let httpResponse = response as? HTTPURLResponse {
+            httpStatusCode = httpResponse.statusCode
+            print("[AnthropicClient] HTTP Status: \(httpStatusCode)")
+        }
+        completionHandler(.allow)
+    }
+    
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        receiveBuffer.append(data)
+        
+        // If HTTP status is not 200, accumulate data but don't parse as SSE
+        // The error will be handled in didCompleteWithError
+        if httpStatusCode != 200 && httpStatusCode != 0 {
+            return
+        }
+        
         guard let chunk = String(data: data, encoding: .utf8) else { return }
         
         let lines = chunk.components(separatedBy: "\n")
@@ -246,6 +266,18 @@ class AnthropicClient: NSObject, AIProvider, URLSessionDataDelegate {
             guard let jsonData = jsonString.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
                 continue
+            }
+            
+            // Check for error events
+            if let type = json["type"] as? String, type == "error",
+               let errorObj = json["error"] as? [String: Any],
+               let message = errorObj["message"] as? String {
+                print("[AnthropicClient] Stream error: \(message)")
+                DispatchQueue.main.async {
+                    self.onStreamComplete?(.failure(AIProviderError.serverError(message)))
+                    self.onStreamComplete = nil
+                }
+                return
             }
             
             // Anthropic 流式格式：content_block_delta
@@ -263,17 +295,50 @@ class AnthropicClient: NSObject, AIProvider, URLSessionDataDelegate {
     
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let error = error {
+            print("[AnthropicClient] Request failed: \(error)")
             DispatchQueue.main.async {
                 self.onStreamComplete?(.failure(AIProviderError.networkError(error)))
             }
         } else {
-            let cleaned = cleanModelOutput(fullResponse)
-            DispatchQueue.main.async {
-                self.onStreamComplete?(.success(cleaned))
+            // Check HTTP status code
+            if httpStatusCode != 200 && httpStatusCode != 0 {
+                let rawBody = String(data: receiveBuffer, encoding: .utf8) ?? "No body"
+                print("[AnthropicClient] HTTP Error \(httpStatusCode): \(rawBody.prefix(500))")
+                
+                var errorMessage = "HTTP \(httpStatusCode)"
+                
+                // Try to extract error message
+                if let errorJson = try? JSONSerialization.jsonObject(with: receiveBuffer) as? [String: Any],
+                   let errorObj = errorJson["error"] as? [String: Any],
+                   let message = errorObj["message"] as? String {
+                    errorMessage = message
+                }
+                
+                let finalError: AIProviderError = httpStatusCode == 429
+                    ? .rateLimited
+                    : .serverError(errorMessage)
+                
+                DispatchQueue.main.async {
+                    self.onStreamComplete?(.failure(finalError))
+                }
+            } else if fullResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // Empty response is an error, not a success
+                print("[AnthropicClient] Empty response received")
+                DispatchQueue.main.async {
+                    self.onStreamComplete?(.failure(AIProviderError.invalidResponse))
+                }
+            } else {
+                let cleaned = cleanModelOutput(fullResponse)
+                DispatchQueue.main.async {
+                    self.onStreamComplete?(.success(cleaned))
+                }
             }
         }
         
         streamSession?.invalidateAndCancel()
         streamSession = nil
+        receiveBuffer = Data()
+        onStreamComplete = nil
+        onStreamUpdate = nil
     }
 }

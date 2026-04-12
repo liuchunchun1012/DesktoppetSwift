@@ -580,6 +580,7 @@ struct ContentView: View {
                 },
                 onComplete: { result in
                     print("[ContentView] onComplete received")
+                    self.chatState.isLoading = false
                     switch result {
                     case .success(let response):
                         print("[ContentView] Success: \(response.prefix(50))...")
@@ -601,6 +602,7 @@ struct ContentView: View {
                     self.chatState.isLoading = false
                 },
                 onComplete: { result in
+                    self.chatState.isLoading = false
                     switch result {
                     case .success(let translation):
                         self.chatState.chatMessage = translation.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -654,6 +656,7 @@ struct ContentView: View {
                 self.chatState.isLoading = false
             },
             onComplete: { result in
+                self.chatState.isLoading = false
                 switch result {
                 case .success(let translation):
                     self.chatState.chatMessage = translation.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -684,6 +687,7 @@ struct ContentView: View {
                 self.chatState.isLoading = false
             },
             onComplete: { result in
+                self.chatState.isLoading = false
                 switch result {
                 case .success(let analysis):
                     self.chatState.chatMessage = analysis.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -742,6 +746,7 @@ struct ContentView: View {
                 self.chatState.isLoading = false
             },
             onComplete: { result in
+                self.chatState.isLoading = false
                 switch result {
                 case .success(let response):
                     self.chatState.chatMessage = response.trimmingCharacters(in: .whitespacesAndNewlines)
