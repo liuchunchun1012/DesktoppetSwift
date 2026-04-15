@@ -30,6 +30,7 @@ class OllamaClient: NSObject, AIProvider, URLSessionDataDelegate {
     private var onStreamUpdate: ((String) -> Void)?
     private var onStreamComplete: ((Result<String, Error>) -> Void)?
     private var fullResponse = ""
+    private var httpStatusCode: Int = 0
     
     override init() {
         super.init()
@@ -71,6 +72,7 @@ class OllamaClient: NSObject, AIProvider, URLSessionDataDelegate {
         self.onStreamComplete = onComplete
         self.fullResponse = ""
         self.streamData = Data()
+        self.httpStatusCode = 0
         
         // Create session with delegate for streaming
         let config = URLSessionConfiguration.default
@@ -82,6 +84,14 @@ class OllamaClient: NSObject, AIProvider, URLSessionDataDelegate {
     }
     
     // URLSessionDataDelegate method for streaming data
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        if let httpResponse = response as? HTTPURLResponse {
+            httpStatusCode = httpResponse.statusCode
+            print("[OllamaClient] HTTP Status: \(httpStatusCode)")
+        }
+        completionHandler(.allow)
+    }
+    
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         // Each chunk is a JSON line
         if let chunk = String(data: data, encoding: .utf8) {
@@ -118,16 +128,32 @@ class OllamaClient: NSObject, AIProvider, URLSessionDataDelegate {
                 self.onStreamComplete?(.failure(error))
             }
         } else {
-            // Filter out model artifacts like "end of turn" and "start of turn"
-            var cleanedResponse = self.fullResponse
-            let artifactsToRemove = ["<end_of_turn>", "end of turn", "<start_of_turn>", "start of turn", "<|eot_id|>", "<|end|>", "<|start|>", "model"]
-            for artifact in artifactsToRemove {
-                cleanedResponse = cleanedResponse.replacingOccurrences(of: artifact, with: "", options: .caseInsensitive)
-            }
-            cleanedResponse = cleanedResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            DispatchQueue.main.async {
-                self.onStreamComplete?(.success(cleanedResponse))
+            let statusCode = httpStatusCode != 0 ? httpStatusCode :
+                (task.response as? HTTPURLResponse)?.statusCode ?? 200
+
+            if statusCode != 200 {
+                let errorMessage = "HTTP \(statusCode)"
+                DispatchQueue.main.async {
+                    self.onStreamComplete?(.failure(NSError(domain: "OllamaClient", code: statusCode, userInfo: [NSLocalizedDescriptionKey: errorMessage])))
+                }
+            } else {
+                // Filter out model artifacts like "end of turn" and "start of turn"
+                var cleanedResponse = self.fullResponse
+                let artifactsToRemove = ["<end_of_turn>", "end of turn", "<start_of_turn>", "start of turn", "<|eot_id|>", "<|end|>", "<|start|>", "model"]
+                for artifact in artifactsToRemove {
+                    cleanedResponse = cleanedResponse.replacingOccurrences(of: artifact, with: "", options: .caseInsensitive)
+                }
+                cleanedResponse = cleanedResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if cleanedResponse.isEmpty {
+                    DispatchQueue.main.async {
+                        self.onStreamComplete?(.failure(OllamaError.invalidResponse))
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.onStreamComplete?(.success(cleanedResponse))
+                    }
+                }
             }
         }
         
@@ -223,6 +249,7 @@ class OllamaClient: NSObject, AIProvider, URLSessionDataDelegate {
         }
         self.fullResponse = ""
         self.streamData = Data()
+        self.httpStatusCode = 0
         
         // Create session with delegate for streaming
         let config = URLSessionConfiguration.default
@@ -365,6 +392,7 @@ class OllamaClient: NSObject, AIProvider, URLSessionDataDelegate {
         self.onStreamComplete = onComplete
         self.fullResponse = ""
         self.streamData = Data()
+        self.httpStatusCode = 0
         
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 120
