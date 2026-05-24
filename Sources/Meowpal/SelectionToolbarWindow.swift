@@ -258,8 +258,7 @@ struct SelectionToolbarView: View {
     
     /// Load cat icon from bundle
     private func loadCatIcon() -> NSImage? {
-        guard let resourcePath = Bundle.main.resourcePath else { return nil }
-        let iconPath = "\(resourcePath)/sprites_aligned/idle/grooming 1-12/frame_02.png"
+        guard let iconPath = SpriteResourceLocator.catIconPath() else { return nil }
         return NSImage(contentsOfFile: iconPath)
     }
 }
