@@ -137,7 +137,25 @@ DeepSeek web search uses model tool calls plus SearXNG. For reliable search, run
 
 ### DeepSeek Web Search Setup
 
-Public SearXNG instances often disable JSON output or rate-limit API traffic. For best results, run SearXNG locally with Docker:
+Public SearXNG instances often disable JSON output or rate-limit API traffic. For best results, run SearXNG locally with Docker.
+
+#### Install Docker
+
+If you don't have Docker installed:
+
+1. Download **Docker Desktop for Mac** from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
+2. Choose the correct version for your chip:
+   - **Apple Silicon** (M1/M2/M3/M4): Download `Apple Chip` version
+   - **Intel Mac**: Download `Intel Chip` version
+3. Open the `.dmg` file and drag Docker to Applications
+4. Launch Docker Desktop and follow the setup wizard
+5. Verify installation:
+
+```bash
+docker --version
+```
+
+#### Run SearXNG
 
 ```bash
 docker run -d --name searxng -p 8080:8080 searxng/searxng
