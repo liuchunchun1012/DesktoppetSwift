@@ -537,6 +537,9 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
             "role": "assistant",
             "content": message["content"] as? String ?? ""
         ]
+        if let reasoningContent = message["reasoning_content"] {
+            sanitized["reasoning_content"] = reasoningContent
+        }
         if let toolCalls = message["tool_calls"] {
             sanitized["tool_calls"] = toolCalls
         }
