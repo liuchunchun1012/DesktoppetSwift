@@ -302,6 +302,9 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
                 if let toolCalls = msg["tool_calls"] {
                     cleaned["tool_calls"] = toolCalls
                 }
+                if let reasoningContent = msg["reasoning_content"] {
+                    cleaned["reasoning_content"] = reasoningContent
+                }
                 return cleaned
             }
             body["messages"] = cleanedMessages
