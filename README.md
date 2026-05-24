@@ -8,7 +8,7 @@ A cute, AI-powered macOS desktop pet! Lives on your screen, ready to chat and he
 
 ### Core Features
 - 🎨 **Pet Animations** - Smooth pixel-art animations (walking, resting, interacting, etc.)
-- 🤖 **Multiple AI Providers** - Supports Ollama / OpenAI / Claude / Gemini / Grok / Qwen / Custom API
+- 🤖 **Multiple AI Providers** - Supports Ollama / OpenAI / Claude / Gemini / Grok / Qwen / DeepSeek / Custom API
 
 ### Tools & Hotkeys
 - ⌨️ **Global Hotkeys** (Customizable)
@@ -49,7 +49,7 @@ A cute, AI-powered macOS desktop pet! Lives on your screen, ready to chat and he
 - macOS 12.0 or later
 - **Intel Mac** or **Apple Silicon (M1/M2/M3/M4)**
 - AI Service (choose one):
-  - **Cloud API**: OpenAI / Claude / Gemini / Grok / Qwen API Key (or API2D proxy)
+  - **Cloud API**: OpenAI / Claude / Gemini / Grok / Qwen / DeepSeek API Key (or API2D proxy)
   - **Local Model**: [Ollama](https://ollama.ai) + any model
 
 ## 🚀 Quick Start
@@ -130,7 +130,10 @@ Click the 🐱 menu bar icon → **Settings** to configure:
 | **Google Gemini** | Latest models synced | ✅ |
 | **xAI Grok** | Latest models synced | ✅ |
 | **Qwen** | Latest models synced | ✅ |
+| **DeepSeek** | Text chat with SearXNG-backed web search tool calls | ✅ |
 | **Custom API** | OpenAI-compatible services (e.g., API2D) | ✅ |
+
+DeepSeek web search uses model tool calls plus SearXNG. The app tries bundled public SearXNG instances by default; optional custom SearXNG URL can be set in Advanced Settings.
 
 ---
 

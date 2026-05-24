@@ -120,7 +120,8 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
     
     func checkHealth(completion: @escaping (Bool) -> Void) {
         // 方案 1: 尝试获取模型列表
-        guard let modelsUrl = URL(string: "\(baseURL)/v1/models") else {
+        let modelsPath = providerType == .deepseek ? "/models" : "/v1/models"
+        guard let modelsUrl = URL(string: "\(baseURL)\(modelsPath)") else {
             completion(false)
             return
         }
@@ -139,14 +140,15 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
             }
             
             // 方案 2: 如果模型列表失败（某些中转不支持），尝试发送一个空的 Chat 请求来验证 Key
-            print("[OpenAIClient] /v1/models failed, trying dry-run chat request...")
+            print("[OpenAIClient] models endpoint failed, trying dry-run chat request...")
             self.performDryRunChat(completion: completion)
             
         }.resume()
     }
     
     private func performDryRunChat(completion: @escaping (Bool) -> Void) {
-        guard let url = URL(string: "\(baseURL)/v1/chat/completions") else {
+        let chatPath = providerType == .deepseek ? "/chat/completions" : "/v1/chat/completions"
+        guard let url = URL(string: "\(baseURL)\(chatPath)") else {
             completion(false)
             return
         }
@@ -203,10 +205,15 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
         onUpdate: @escaping (String) -> Void,
         onComplete: @escaping (Result<String, Error>) -> Void
     ) {
+        if providerType == .deepseek && config.enableWebSearch {
+            sendDeepSeekToolRequest(messages: messages, onUpdate: onUpdate, onComplete: onComplete)
+            return
+        }
+        
         let isAPI2DClaude = baseURL.contains("api2d") && currentModel.lowercased().contains("claude")
         
         // 如果是 API2D 的 Claude，尝试使用原生路径以获得更好稳定性
-        var finalURLString = "\(baseURL)/v1/chat/completions"
+        let finalURLString = providerType == .deepseek ? "\(baseURL)/chat/completions" : "\(baseURL)/v1/chat/completions"
         if isAPI2DClaude && !baseURL.contains("/claude") {
             // 如果用户填的是 https://oa.api2d.net，我们补全路径
             // 或者兼容它已经填了 https://oa.api2d.net/claude 的情况
@@ -287,8 +294,15 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
             // 标准 OpenAI 模式：保持消息在 messages 数组中
             let cleanedMessages: [[String: Any]] = messages.compactMap { msg in
                 guard let role = msg["role"] as? String else { return nil }
-                let contentStr = (msg["content"] as? String) ?? ""
-                return ["role": role, "content": contentStr]
+                var cleaned: [String: Any] = ["role": role]
+                cleaned["content"] = msg["content"] ?? ""
+                if let toolCallID = msg["tool_call_id"] {
+                    cleaned["tool_call_id"] = toolCallID
+                }
+                if let toolCalls = msg["tool_calls"] {
+                    cleaned["tool_calls"] = toolCalls
+                }
+                return cleaned
             }
             body["messages"] = cleanedMessages
         }
@@ -315,6 +329,233 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
         
         let task = streamSession?.dataTask(with: request)
         task?.resume()
+    }
+    
+    private struct DeepSeekToolCall {
+        let id: String
+        let name: String
+        let arguments: String
+    }
+    
+    private func sendDeepSeekToolRequest(
+        messages: [[String: Any]],
+        onUpdate: @escaping (String) -> Void,
+        onComplete: @escaping (Result<String, Error>) -> Void
+    ) {
+        guard let url = URL(string: "\(baseURL)/chat/completions") else {
+            onComplete(.failure(AIProviderError.invalidResponse))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        
+        var body: [String: Any] = [
+            "model": currentModel,
+            "messages": messages,
+            "stream": false,
+            "tools": [deepSeekWebSearchTool()],
+            "tool_choice": "auto"
+        ]
+        if config.maxTokens > 0 {
+            body["max_tokens"] = config.maxTokens
+        }
+        if config.temperature != 1.0 {
+            body["temperature"] = config.temperature
+        }
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            onComplete(.failure(error))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { onComplete(.failure(error)) }
+                return
+            }
+            
+            guard let data = data,
+                  let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                DispatchQueue.main.async {
+                    onComplete(.failure(NSError(domain: "AIProvider", code: status, userInfo: [NSLocalizedDescriptionKey: "HTTP \(status): \(body)"])))
+                }
+                return
+            }
+            
+            self.handleDeepSeekToolResponse(data: data, originalMessages: messages, onUpdate: onUpdate, onComplete: onComplete)
+        }.resume()
+    }
+    
+    private func deepSeekWebSearchTool() -> [String: Any] {
+        [
+            "type": "function",
+            "function": [
+                "name": "web_search",
+                "description": "Search the web for current information and return concise results with source URLs.",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "query": [
+                            "type": "string",
+                            "description": "The web search query."
+                        ],
+                        "count": [
+                            "type": "integer",
+                            "description": "The number of search results to return.",
+                            "minimum": 1,
+                            "maximum": 10
+                        ]
+                    ],
+                    "required": ["query"]
+                ]
+            ]
+        ]
+    }
+    
+    private func handleDeepSeekToolResponse(
+        data: Data,
+        originalMessages: [[String: Any]],
+        onUpdate: @escaping (String) -> Void,
+        onComplete: @escaping (Result<String, Error>) -> Void
+    ) {
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let first = choices.first,
+                  let message = first["message"] as? [String: Any] else {
+                DispatchQueue.main.async { onComplete(.failure(AIProviderError.invalidResponse)) }
+                return
+            }
+            
+            let toolCalls = parseDeepSeekToolCalls(from: message)
+            guard !toolCalls.isEmpty else {
+                if let content = message["content"] as? String, !content.isEmpty {
+                    DispatchQueue.main.async {
+                        onUpdate(content)
+                        onComplete(.success(self.cleanModelOutput(content)))
+                    }
+                } else {
+                    DispatchQueue.main.async { onComplete(.failure(AIProviderError.invalidResponse)) }
+                }
+                return
+            }
+            
+            executeDeepSeekToolCall(toolCalls[0], originalMessages: originalMessages, assistantMessage: message, onUpdate: onUpdate, onComplete: onComplete)
+        } catch {
+            DispatchQueue.main.async { onComplete(.failure(error)) }
+        }
+    }
+    
+    private func parseDeepSeekToolCalls(from message: [String: Any]) -> [DeepSeekToolCall] {
+        guard let rawToolCalls = message["tool_calls"] as? [[String: Any]] else {
+            return []
+        }
+        
+        return rawToolCalls.compactMap { raw in
+            guard let id = raw["id"] as? String,
+                  let function = raw["function"] as? [String: Any],
+                  let name = function["name"] as? String else {
+                return nil
+            }
+            let arguments = function["arguments"] as? String ?? "{}"
+            return DeepSeekToolCall(id: id, name: name, arguments: arguments)
+        }
+    }
+    
+    private func executeDeepSeekToolCall(
+        _ toolCall: DeepSeekToolCall,
+        originalMessages: [[String: Any]],
+        assistantMessage: [String: Any],
+        onUpdate: @escaping (String) -> Void,
+        onComplete: @escaping (Result<String, Error>) -> Void
+    ) {
+        guard toolCall.name == "web_search" else {
+            DispatchQueue.main.async {
+                onComplete(.failure(AIProviderError.serverError("Unsupported DeepSeek tool call: \(toolCall.name)")))
+            }
+            return
+        }
+        
+        let query = parseWebSearchQuery(arguments: toolCall.arguments)
+        guard !query.isEmpty else {
+            DispatchQueue.main.async {
+                onComplete(.failure(AIProviderError.serverError("DeepSeek requested web_search without a query.")))
+            }
+            return
+        }
+        
+        let count = parseWebSearchCount(arguments: toolCall.arguments)
+        SearXNGClient.shared.search(query: query, count: count) { result in
+            let content: String
+            switch result {
+            case .success(let results):
+                content = SearXNGClient.formatToolResult(query: query, results: results)
+            case .failure(let error):
+                content = "Web search failed for query: \(query). Error: \(error.localizedDescription)"
+            }
+            
+            var nextMessages = originalMessages
+            nextMessages.append(self.sanitizedAssistantToolMessage(assistantMessage))
+            nextMessages.append([
+                "role": "tool",
+                "tool_call_id": toolCall.id,
+                "content": content
+            ])
+            self.sendStreamRequestWithoutDeepSeekTools(messages: nextMessages, onUpdate: onUpdate, onComplete: onComplete)
+        }
+    }
+    
+    private func parseWebSearchQuery(arguments: String) -> String {
+        guard let data = arguments.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let query = json["query"] as? String else {
+            return ""
+        }
+        return query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private func parseWebSearchCount(arguments: String) -> Int {
+        guard let data = arguments.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return UserSettings.shared.searxngResultCount
+        }
+        let requested = json["count"] as? Int ?? UserSettings.shared.searxngResultCount
+        return max(1, min(requested, 10))
+    }
+    
+    private func sanitizedAssistantToolMessage(_ message: [String: Any]) -> [String: Any] {
+        var sanitized: [String: Any] = [
+            "role": "assistant",
+            "content": message["content"] as? String ?? ""
+        ]
+        if let toolCalls = message["tool_calls"] {
+            sanitized["tool_calls"] = toolCalls
+        }
+        return sanitized
+    }
+    
+    private func sendStreamRequestWithoutDeepSeekTools(
+        messages: [[String: Any]],
+        onUpdate: @escaping (String) -> Void,
+        onComplete: @escaping (Result<String, Error>) -> Void
+    ) {
+        let originalConfig = config
+        var noSearchConfig = config
+        noSearchConfig.enableWebSearch = false
+        config = noSearchConfig
+        sendStreamRequest(messages: messages, onUpdate: onUpdate) { result in
+            self.config = originalConfig
+            onComplete(result)
+        }
     }
     
     // MARK: - URLSessionDataDelegate
