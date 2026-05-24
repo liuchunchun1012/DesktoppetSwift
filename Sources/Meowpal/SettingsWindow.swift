@@ -254,7 +254,7 @@ struct AISettingsTab: View {
 
                     if settings.currentProvider == .deepseek {
                         TextField("SearXNG URL (optional)", text: $settings.searxngBaseURL)
-                        Text("Leave blank to use bundled public SearXNG instances.")
+                        Text("Recommended: run local SearXNG at http://localhost:8080 with JSON enabled.")
                             .font(.caption)
                             .foregroundColor(.secondary)
 

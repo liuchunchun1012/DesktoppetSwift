@@ -133,7 +133,43 @@ Click the 🐱 menu bar icon → **Settings** to configure:
 | **DeepSeek** | Text chat with SearXNG-backed web search tool calls | ✅ |
 | **Custom API** | OpenAI-compatible services (e.g., API2D) | ✅ |
 
-DeepSeek web search uses model tool calls plus SearXNG. The app tries bundled public SearXNG instances by default; optional custom SearXNG URL can be set in Advanced Settings.
+DeepSeek web search uses model tool calls plus SearXNG. For reliable search, run a local SearXNG instance and set its URL in Advanced Settings.
+
+### DeepSeek Web Search Setup
+
+Public SearXNG instances often disable JSON output or rate-limit API traffic. For best results, run SearXNG locally with Docker:
+
+```bash
+docker run -d --name searxng -p 8080:8080 searxng/searxng
+```
+
+Enable JSON output in the container:
+
+```bash
+docker exec searxng sh -lc "cp /etc/searxng/settings.yml /etc/searxng/settings.yml.bak && sed -i '/^[[:space:]]*- html$/a\    - json' /etc/searxng/settings.yml"
+docker restart searxng
+```
+
+Verify JSON works:
+
+```bash
+curl -i 'http://localhost:8080/search?q=test&format=json'
+```
+
+Expected:
+
+```text
+HTTP/1.1 200 OK
+content-type: application/json
+```
+
+Then open **Settings → AI Settings → Advanced Settings**:
+
+- Enable `Web Search`
+- Set `SearXNG URL` to `http://localhost:8080`
+- Save
+
+Do not include `/search` in the SearXNG URL.
 
 ---
 
