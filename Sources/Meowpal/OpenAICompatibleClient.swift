@@ -501,9 +501,22 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
             let content: String
             switch result {
             case .success(let results):
+                guard !results.isEmpty else {
+                    let message = self.webSearchUnavailableMessage(query: query, reason: "No web results were returned.")
+                    DispatchQueue.main.async {
+                        onUpdate(message)
+                        onComplete(.success(message))
+                    }
+                    return
+                }
                 content = SearXNGClient.formatToolResult(query: query, results: results)
             case .failure(let error):
-                content = "Web search failed for query: \(query). Error: \(error.localizedDescription)"
+                let message = self.webSearchUnavailableMessage(query: query, reason: error.localizedDescription)
+                DispatchQueue.main.async {
+                    onUpdate(message)
+                    onComplete(.success(message))
+                }
+                return
             }
             
             var nextMessages = originalMessages
@@ -515,6 +528,17 @@ class OpenAICompatibleClient: NSObject, AIProvider, URLSessionDataDelegate {
             ])
             self.sendStreamRequestWithoutDeepSeekTools(messages: nextMessages, onUpdate: onUpdate, onComplete: onComplete)
         }
+    }
+    
+    private func webSearchUnavailableMessage(query: String, reason: String) -> String {
+        """
+        喵呜，联网搜索这次没有成功，所以我不能可靠地回答“最近/最新”这类需要实时信息的问题。
+        
+        搜索词：\(query)
+        原因：\(reason)
+        
+        你可以在 Settings → AI Settings → Advanced Settings 里填写一个可用的 SearXNG URL 后再试。
+        """
     }
     
     private func parseWebSearchQuery(arguments: String) -> String {
