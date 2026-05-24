@@ -60,7 +60,7 @@ class AIProviderManager: ObservableObject {
         case .ollama:
             return OllamaClient.shared
             
-        case .openai, .grok, .qwen, .custom:
+        case .openai, .grok, .qwen, .deepseek, .custom:
             // Grok uses OpenAI-compatible API
             return OpenAICompatibleClient(
                 providerType: type,
@@ -287,6 +287,13 @@ class AIProviderManager: ObservableObject {
             return
         }
         
+        if currentProviderType == .deepseek {
+            let message = "DeepSeek mode currently supports text chat and SearXNG web search, but not image analysis. Please switch to a vision-capable provider such as OpenAI, Gemini, Qwen, Claude, Grok, or Ollama for screenshots."
+            onUpdate(message)
+            onComplete(.success(message))
+            return
+        }
+        
         // 添加到历史（带图片标记）
         let historyMessage = "[User sent an image] \(question)"
         chatHistory.append(["role": "user", "content": historyMessage])
@@ -365,8 +372,8 @@ class AIProviderManager: ObservableObject {
                 return
             }
 
-        case .openai, .grok, .qwen, .custom:
-            // OpenAI/Grok/Qwen/Custom use optimized client
+        case .openai, .grok, .qwen, .deepseek, .custom:
+            // OpenAI/Grok/Qwen/DeepSeek/Custom use optimized client
             let currentConfig = UserSettings.shared.getConfig(for: currentProviderType)
             if let apiKey = KeychainHelper.shared.getAPIKey(for: currentProviderType) {
                 let fastClient = OpenAICompatibleClient(

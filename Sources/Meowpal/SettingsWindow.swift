@@ -213,7 +213,7 @@ struct AISettingsTab: View {
             if settings.currentProvider.requiresAPIKey {
                 SecureField("API Key", text: $apiKeyInput)
                 
-                if settings.currentProvider == .custom {
+                if settings.currentProvider == .custom || settings.currentProvider == .deepseek {
                     TextField("Base URL", text: $baseURLInput)
                 }
             }
@@ -251,6 +251,15 @@ struct AISettingsTab: View {
             DisclosureGroup("Advanced Settings", isExpanded: $showAdvancedSettings) {
                 Group {
                     Toggle("Enable Web Search", isOn: $enableWebSearch)
+
+                    if settings.currentProvider == .deepseek {
+                        TextField("SearXNG URL (optional)", text: $settings.searxngBaseURL)
+                        Text("Recommended: run local SearXNG at http://localhost:8080 with JSON enabled.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Stepper("Search Results: \(settings.searxngResultCount)", value: $settings.searxngResultCount, in: 1...10)
+                    }
                     
                     TextField("Max Tokens", value: $maxTokens, format: .number)
                     Text("Recommended: \(settings.currentProvider.defaultMaxTokens)")
@@ -345,7 +354,7 @@ struct AISettingsTab: View {
         // 更新配置
         var config = settings.getConfig(for: type)
         config.model = selectedModel
-        if type == .custom {
+        if type == .custom || type == .deepseek {
             config.baseURL = baseURLInput
         }
 

@@ -8,7 +8,7 @@ A cute, AI-powered macOS desktop pet! Lives on your screen, ready to chat and he
 
 ### Core Features
 - 🎨 **Pet Animations** - Smooth pixel-art animations (walking, resting, interacting, etc.)
-- 🤖 **Multiple AI Providers** - Supports Ollama / OpenAI / Claude / Gemini / Grok / Qwen / Custom API
+- 🤖 **Multiple AI Providers** - Supports Ollama / OpenAI / Claude / Gemini / Grok / Qwen / DeepSeek / Custom API
 
 ### Tools & Hotkeys
 - ⌨️ **Global Hotkeys** (Customizable)
@@ -49,7 +49,7 @@ A cute, AI-powered macOS desktop pet! Lives on your screen, ready to chat and he
 - macOS 12.0 or later
 - **Intel Mac** or **Apple Silicon (M1/M2/M3/M4)**
 - AI Service (choose one):
-  - **Cloud API**: OpenAI / Claude / Gemini / Grok / Qwen API Key (or API2D proxy)
+  - **Cloud API**: OpenAI / Claude / Gemini / Grok / Qwen / DeepSeek API Key (or API2D proxy)
   - **Local Model**: [Ollama](https://ollama.ai) + any model
 
 ## 🚀 Quick Start
@@ -130,7 +130,64 @@ Click the 🐱 menu bar icon → **Settings** to configure:
 | **Google Gemini** | Latest models synced | ✅ |
 | **xAI Grok** | Latest models synced | ✅ |
 | **Qwen** | Latest models synced | ✅ |
+| **DeepSeek** | Text chat with SearXNG-backed web search tool calls | ✅ |
 | **Custom API** | OpenAI-compatible services (e.g., API2D) | ✅ |
+
+DeepSeek web search uses model tool calls plus SearXNG. For reliable search, run a local SearXNG instance and set its URL in Advanced Settings.
+
+### DeepSeek Web Search Setup
+
+Public SearXNG instances often disable JSON output or rate-limit API traffic. For best results, run SearXNG locally with Docker.
+
+#### Install Docker
+
+If you don't have Docker installed:
+
+1. Download **Docker Desktop for Mac** from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
+2. Choose the correct version for your chip:
+   - **Apple Silicon** (M1/M2/M3/M4): Download `Apple Chip` version
+   - **Intel Mac**: Download `Intel Chip` version
+3. Open the `.dmg` file and drag Docker to Applications
+4. Launch Docker Desktop and follow the setup wizard
+5. Verify installation:
+
+```bash
+docker --version
+```
+
+#### Run SearXNG
+
+```bash
+docker run -d --name searxng -p 8080:8080 searxng/searxng
+```
+
+Enable JSON output in the container:
+
+```bash
+docker exec searxng sh -lc "cp /etc/searxng/settings.yml /etc/searxng/settings.yml.bak && sed -i '/^[[:space:]]*- html$/a\    - json' /etc/searxng/settings.yml"
+docker restart searxng
+```
+
+Verify JSON works:
+
+```bash
+curl -i 'http://localhost:8080/search?q=test&format=json'
+```
+
+Expected:
+
+```text
+HTTP/1.1 200 OK
+content-type: application/json
+```
+
+Then open **Settings → AI Settings → Advanced Settings**:
+
+- Enable `Web Search`
+- Set `SearXNG URL` to `http://localhost:8080`
+- Save
+
+Do not include `/search` in the SearXNG URL.
 
 ---
 

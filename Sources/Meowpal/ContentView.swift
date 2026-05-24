@@ -83,16 +83,9 @@ class SpriteAnimator: ObservableObject {
             "walk/down": "walk_down"
         ]
         
-        // Load sprites from bundle resources
-        guard let resourcePath = Bundle.main.resourcePath else {
-            print("⚠️ Bundle resources not found!")
-            return
-        }
-
-        let sourcePath = resourcePath + "/sprites_aligned"
-        guard FileManager.default.fileExists(atPath: sourcePath) else {
-            print("⚠️ Sprites not found at: \(sourcePath)")
-            print("Please ensure sprites are included in the app bundle.")
+        guard let sourcePath = SpriteResourceLocator.spritesRootPath() else {
+            print("⚠️ Sprites not found.")
+            print("Please ensure sprites are included in the app bundle or SwiftPM resources.")
             return
         }
 

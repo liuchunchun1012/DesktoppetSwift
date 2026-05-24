@@ -10,6 +10,7 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
     case gemini = "gemini"
     case grok = "grok"
     case qwen = "qwen"
+    case deepseek = "deepseek"
     case custom = "custom"
     
     var id: String { rawValue }
@@ -23,6 +24,7 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
         case .gemini: return "Google Gemini"
         case .grok: return "xAI Grok"
         case .qwen: return "Qwen (Tongyi)"
+        case .deepseek: return "DeepSeek"
         case .custom: return "Custom (OpenAI Compatible)"
         }
     }
@@ -36,6 +38,7 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
         case .gemini: return "https://generativelanguage.googleapis.com"
         case .grok: return "https://api.x.ai"
         case .qwen: return "https://dashscope.aliyuncs.com/compatible-mode"
+        case .deepseek: return "https://api.deepseek.com"
         case .custom: return ""
         }
     }
@@ -55,6 +58,8 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
             return ["grok-3", "grok-3-fast", "grok-3-mini", "grok-3-mini-fast", "grok-2-vision"]
         case .qwen:
             return ["qwen3-max", "qwen3-vl-plus", "qwen-vl-max", "qwen-plus"]
+        case .deepseek:
+            return ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner"]
         case .custom:
             return [
                 "gpt-4o",
@@ -89,6 +94,7 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
         case .gemini: return true
         case .grok: return true  // grok-2-vision supports images
         case .qwen: return true
+        case .deepseek: return false
         case .custom: return true
         }
     }
@@ -340,6 +346,7 @@ extension AIProviderType {
         case .gemini: return 65536
         case .grok: return 8192
         case .qwen: return 8192
+        case .deepseek: return 8192
         case .custom: return 8192
         }
     }

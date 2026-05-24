@@ -15,7 +15,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Meowpal",
-            path: "Sources/Meowpal"
+            path: "Sources/Meowpal",
+            exclude: ["Resources"]
         )
     ]
 )

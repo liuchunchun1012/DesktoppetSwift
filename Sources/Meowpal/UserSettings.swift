@@ -114,6 +114,8 @@ class UserSettings: ObservableObject {
         static let obsidianTasksFile = "obsidianTasksFile"
         static let summaryDestination = "summaryDestination"
         static let obsidianDailyNotesFolder = "obsidianDailyNotesFolder"
+        static let searxngBaseURL = "searxngBaseURL"
+        static let searxngResultCount = "searxngResultCount"
         // 快捷键配置
         static let hotkeyChat = "hotkeyChat"
         static let hotkeyTranslate = "hotkeyTranslate"
@@ -283,6 +285,20 @@ class UserSettings: ObservableObject {
         }
     }
 
+    /// Optional custom SearXNG base URL for DeepSeek web search
+    @Published var searxngBaseURL: String {
+        didSet {
+            defaults.set(searxngBaseURL, forKey: Keys.searxngBaseURL)
+        }
+    }
+
+    /// Number of SearXNG results to return to DeepSeek
+    @Published var searxngResultCount: Int {
+        didSet {
+            defaults.set(searxngResultCount, forKey: Keys.searxngResultCount)
+        }
+    }
+    
     // MARK: - 快捷键配置
     
     /// 对话快捷键 (默认: J)
@@ -400,6 +416,9 @@ class UserSettings: ObservableObject {
             self.summaryDestination = .notion
         }
         self.obsidianDailyNotesFolder = defaults.string(forKey: Keys.obsidianDailyNotesFolder) ?? "DailyNotes"
+        self.searxngBaseURL = defaults.string(forKey: Keys.searxngBaseURL) ?? ""
+        let savedSearxngResultCount = defaults.integer(forKey: Keys.searxngResultCount)
+        self.searxngResultCount = savedSearxngResultCount > 0 ? savedSearxngResultCount : 5
 
         // 加载快捷键配置
         self.hotkeyChat = Self.loadHotkeyConfig(from: defaults, key: Keys.hotkeyChat, default: .defaultChat)
@@ -506,6 +525,8 @@ class UserSettings: ObservableObject {
         petName = PetConfig.petName
         petNickname = PetConfig.petNickname
         ownerName = PetConfig.ownerName
+        searxngBaseURL = ""
+        searxngResultCount = 5
 
         for type in AIProviderType.allCases {
             providerConfigs[type] = ProviderConfiguration(type: type)
