@@ -16,14 +16,6 @@ enum SpriteResourceLocator {
             candidates.append(resourcePath + "/sprites_aligned")
         }
         
-        #if SWIFT_PACKAGE
-        if let packageResourcePath = Bundle.module.resourcePath {
-            candidates.append(packageResourcePath + "/Resources")
-            candidates.append(packageResourcePath + "/sprites_aligned")
-            candidates.append(packageResourcePath)
-        }
-        #endif
-        
         candidates.append(fileManager.currentDirectoryPath + "/Sources/Meowpal/Resources")
         
         return candidates.first { path in
