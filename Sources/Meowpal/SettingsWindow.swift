@@ -181,6 +181,7 @@ struct AISettingsTab: View {
     @StateObject private var settings = UserSettings.shared
     @State private var apiKeyInput = ""
     @State private var baseURLInput = ""
+    @State private var opencodeAgentInput = ""
     @State private var selectedModel = ""
     @State private var connectionStatus: ConnectionStatus = .unknown
     @State private var ollamaModels: [String] = []
@@ -217,6 +218,17 @@ struct AISettingsTab: View {
                     TextField("Base URL", text: $baseURLInput)
                 }
             }
+
+            if settings.currentProvider == .opencode {
+                TextField("Base URL", text: $baseURLInput)
+                TextField("Agent (optional)", text: $opencodeAgentInput)
+                Text("Use an OpenCode agent name such as build, plan, general, or explore. Leave blank to use OpenCode's default. Do not enter a model name here.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("Run OpenCode with: opencode serve --port 4096 --print-logs --log-level DEBUG")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
             // Model Selection
             if settings.currentProvider == .ollama {
@@ -232,6 +244,11 @@ struct AISettingsTab: View {
                 .onAppear { loadOllamaModels() }
 
                 Button("Refresh Models") { loadOllamaModels() }
+            } else if settings.currentProvider == .opencode {
+                Text("Model (optional, provider/model):")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                TextField("Leave blank to use OpenCode default", text: $selectedModel)
             } else {
                 Picker("Model", selection: $selectedModel) {
                     ForEach(settings.currentProvider.recommendedModels, id: \.self) { model in
@@ -251,6 +268,12 @@ struct AISettingsTab: View {
             DisclosureGroup("Advanced Settings", isExpanded: $showAdvancedSettings) {
                 Group {
                     Toggle("Enable Web Search", isOn: $enableWebSearch)
+
+                    if settings.currentProvider == .opencode {
+                        Text("For OpenCode, this allows OpenCode agent tools. Web search depends on your OpenCode tool/plugin configuration and permissions.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
 
                     if settings.currentProvider == .deepseek {
                         TextField("SearXNG URL (optional)", text: $settings.searxngBaseURL)
@@ -313,6 +336,7 @@ struct AISettingsTab: View {
         let config = settings.getConfig(for: type)
         selectedModel = config.model
         baseURLInput = config.baseURL
+        opencodeAgentInput = config.agent ?? ""
 
         // 加载高级设置
         enableWebSearch = config.enableWebSearch
@@ -354,8 +378,13 @@ struct AISettingsTab: View {
         // 更新配置
         var config = settings.getConfig(for: type)
         config.model = selectedModel
-        if type == .custom || type == .deepseek {
+        if type == .custom || type == .deepseek || type == .opencode {
             config.baseURL = baseURLInput
+        }
+        if type == .opencode {
+            config.agent = opencodeAgentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? nil
+                : opencodeAgentInput.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         // 保存高级设置

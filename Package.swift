@@ -17,6 +17,10 @@ let package = Package(
             name: "Meowpal",
             path: "Sources/Meowpal",
             exclude: ["Resources"]
+        ),
+        .testTarget(
+            name: "MeowpalTests",
+            dependencies: ["Meowpal"]
         )
     ]
 )
