@@ -59,8 +59,6 @@ class AIProviderManager: ObservableObject {
         switch type {
         case .ollama:
             return OllamaClient.shared
-        case .opencode:
-            return OpenCodeClient(config: config)
             
         case .openai, .grok, .qwen, .deepseek, .custom:
             // Grok uses OpenAI-compatible API
@@ -394,10 +392,6 @@ class AIProviderManager: ObservableObject {
                 )
                 return
             }
-
-        case .opencode:
-            // OpenCode Agent uses the configured local agent session for translation too.
-            break
 
         case .ollama:
             // Ollama 使用当前提供商（本地模型，已经很快）

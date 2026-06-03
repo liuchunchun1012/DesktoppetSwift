@@ -12,7 +12,6 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
     case qwen = "qwen"
     case deepseek = "deepseek"
     case custom = "custom"
-    case opencode = "opencode"
     
     var id: String { rawValue }
     
@@ -27,7 +26,6 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
         case .qwen: return "Qwen (Tongyi)"
         case .deepseek: return "DeepSeek"
         case .custom: return "Custom (OpenAI Compatible)"
-        case .opencode: return "OpenCode Agent (Local)"
         }
     }
     
@@ -42,7 +40,6 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
         case .qwen: return "https://dashscope.aliyuncs.com/compatible-mode"
         case .deepseek: return "https://api.deepseek.com"
         case .custom: return ""
-        case .opencode: return "http://127.0.0.1:4096"
         }
     }
     
@@ -72,8 +69,6 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
                 "gemini-2.5-flash",
                 "deepseek-chat"
             ]
-        case .opencode:
-            return []
         }
     }
     
@@ -85,7 +80,7 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
     /// Requires API Key
     var requiresAPIKey: Bool {
         switch self {
-        case .ollama, .opencode: return false
+        case .ollama: return false
         default: return true
         }
     }
@@ -101,7 +96,6 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
         case .qwen: return true
         case .deepseek: return false
         case .custom: return true
-        case .opencode: return false
         }
     }
 }
@@ -313,7 +307,6 @@ struct ProviderConfiguration: Codable, Identifiable {
     var baseURL: String
     var model: String
     var isEnabled: Bool
-    var agent: String?
     
     // 生成参数
     var enableWebSearch: Bool
@@ -326,7 +319,6 @@ struct ProviderConfiguration: Codable, Identifiable {
         baseURL: String? = nil,
         model: String? = nil,
         isEnabled: Bool = true,
-        agent: String? = nil,
         enableWebSearch: Bool = true,
         maxTokens: Int? = nil,
         temperature: Double = 1.0,
@@ -336,7 +328,6 @@ struct ProviderConfiguration: Codable, Identifiable {
         self.baseURL = baseURL ?? type.defaultBaseURL
         self.model = model ?? type.defaultModel
         self.isEnabled = isEnabled
-        self.agent = agent
         self.enableWebSearch = enableWebSearch
         // 默认 max_tokens 根据提供商不同
         self.maxTokens = maxTokens ?? type.defaultMaxTokens
@@ -357,7 +348,6 @@ extension AIProviderType {
         case .qwen: return 8192
         case .deepseek: return 8192
         case .custom: return 8192
-        case .opencode: return 8192
         }
     }
 }
